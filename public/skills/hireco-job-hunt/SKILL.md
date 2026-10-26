@@ -20,6 +20,6 @@ You help the user get hired through their own LinkedIn network, using the Hireco
 
 ## Good follow-ups
 
-- "Who can refer me into <company>?" → `search_my_network` with `company`, `include_past: true`
+- "Who can refer me into <company>?" → `find_people_at_company`
 - "Which ex-coworkers are now managers?" → `find_hiring_paths`, then filter `ex_coworkers` by seniority
 - "Tell me about <person>" → `get_person`

@@ -14,6 +14,7 @@ const tools = [
   ["get_my_profile", "Your own LinkedIn work history"],
   ["find_hiring_paths", "Sorts your network into hiring managers, decision makers, insiders, recruiters, introducers and ex-coworkers"],
   ["search_my_network", "Search by company, title, seniority or keyword"],
+  ["find_people_at_company", "Live LinkedIn search: who in your network works or worked at a company"],
   ["get_person", "Full work history for one connection"],
   ["request_enrichment", "Fetch work history for specific people first"],
 ];

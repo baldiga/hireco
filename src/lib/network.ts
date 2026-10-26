@@ -153,65 +153,93 @@ export function searchNetwork(
 const SENIOR: Seniority[] = ["c_level", "vp", "head", "director"];
 const MANAGERS: Seniority[] = ["manager", "head", "director"];
 
+
+/** Result of a LinkedIn "1st-degree + current/past company" search, run by the extension. */
+export type CompanyHit = { company: string; relation: "current" | "past"; public_ids: string[] };
+
+type Person = ReturnType<typeof brief> & { why: string; at_target?: boolean; overlap_months?: number | null };
+
 export function findHiringPaths(
   conns: Connection[],
   me: { positions: Position[] } | null,
   q: { role_keywords: string[]; target_companies?: string[]; limit_per_bucket?: number },
+  companyHits: CompanyHit[] = [],
 ) {
   const limit = q.limit_per_bucket ?? 25;
   const targets = q.target_companies ?? [];
   const atTarget = (company: string | null | undefined) => targets.find((t) => sameCompany(company, t));
+  const myCompanies = (me?.positions ?? []).map((p) => p.company).filter(Boolean) as string[];
   const buckets = {
-    hiring_managers: [] as object[],
-    decision_makers: [] as object[],
-    insiders: [] as object[],
-    recruiters: [] as object[],
-    introducers: [] as object[],
-    ex_coworkers: [] as object[],
+    hiring_managers: new Map<string, Person>(),
+    decision_makers: new Map<string, Person>(),
+    insiders: new Map<string, Person>(),
+    recruiters: new Map<string, Person>(),
+    introducers: new Map<string, Person>(),
+    ex_coworkers: new Map<string, Person>(),
   };
+  const add = (bucket: Map<string, Person>, id: string, p: Person) => { if (!bucket.has(id)) bucket.set(id, p); };
+
+  // LinkedIn search tells us who is (or was) at a company even when the headline doesn't say so.
+  const nowAtTarget = new Map<string, string>();
+  const pastAtTarget = new Map<string, Set<string>>();
+  const sharedWithMe = new Map<string, Set<string>>();
+  for (const hit of companyHits) {
+    const target = atTarget(hit.company);
+    const mine = myCompanies.find((m) => sameCompany(m, hit.company));
+    for (const id of hit.public_ids) {
+      if (target && hit.relation === "current") nowAtTarget.set(id, target);
+      if (target && hit.relation === "past") pastAtTarget.set(id, (pastAtTarget.get(id) ?? new Set()).add(target));
+      if (mine) sharedWithMe.set(id, (sharedWithMe.get(id) ?? new Set()).add(mine));
+    }
+  }
 
   for (const c of conns) {
+    const id = c.public_id;
     const title = c.current_title ?? c.headline ?? "";
     const level = seniorityOf(title);
     const inFunction = matchesAny(`${title} ${c.headline ?? ""}`, q.role_keywords);
-    const target = atTarget(c.current_company);
+    const target = atTarget(c.current_company) ?? nowAtTarget.get(id);
     const b = brief(c);
 
     if (inFunction && MANAGERS.includes(level))
-      buckets.hiring_managers.push({ ...b, why: `${level} in your function${target ? ` at target ${target}` : ""}`, at_target: !!target });
+      add(buckets.hiring_managers, id, { ...b, why: `${level} in your function${target ? ` at target ${target}` : ""}`, at_target: !!target });
     if (SENIOR.includes(level) && (inFunction || (target && level === "c_level")))
-      buckets.decision_makers.push({ ...b, why: `${level}${inFunction ? " in your function" : ""}${target ? ` at target ${target}` : ""}`, at_target: !!target });
-    if (target) buckets.insiders.push({ ...b, why: `works at ${target}` });
+      add(buckets.decision_makers, id, { ...b, why: `${level}${inFunction ? " in your function" : ""}${target ? ` at target ${target}` : ""}`, at_target: !!target });
+    if (target) add(buckets.insiders, id, { ...b, why: `works at ${target}` });
     if (RECRUITER.test(title))
-      buckets.recruiters.push({ ...b, why: `recruiting / talent${target ? ` at target ${target}` : ""}`, at_target: !!target });
+      add(buckets.recruiters, id, { ...b, why: `recruiting / talent${target ? ` at target ${target}` : ""}`, at_target: !!target });
 
-    const pastTargets = (c.positions ?? []).filter((p) => p.end && atTarget(p.company)).map((p) => p.company);
-    if (pastTargets.length && !target)
-      buckets.introducers.push({ ...b, why: `previously at ${[...new Set(pastTargets)].join(", ")} — knows people there` });
+    const pastTargets = new Set([
+      ...(c.positions ?? []).filter((p) => p.end && atTarget(p.company)).map((p) => atTarget(p.company)!),
+      ...(pastAtTarget.get(id) ?? []),
+    ]);
+    if (pastTargets.size && !target)
+      add(buckets.introducers, id, { ...b, why: `previously at ${[...pastTargets].join(", ")} — knows people there` });
 
+    // Ex-coworkers: exact overlap from enriched history first, then LinkedIn search matches.
     for (const mine of me?.positions ?? []) {
       const theirs = (c.positions ?? []).find((p) => sameCompany(p.company, mine.company));
       if (!theirs) continue;
       const months = overlapMonths(mine, theirs);
       if (months === null || months > 0) {
-        buckets.ex_coworkers.push({ ...b, why: `both at ${mine.company}${months ? ` (~${months} months overlap)` : ""}`, overlap_months: months });
+        add(buckets.ex_coworkers, id, { ...b, why: `both at ${mine.company}${months ? ` (~${months} months overlap)` : ""}`, overlap_months: months });
         break;
       }
     }
+    const shared = sharedWithMe.get(id);
+    if (shared && !c.enriched_at)
+      add(buckets.ex_coworkers, id, { ...b, why: `also worked at ${[...shared].join(", ")} (dates not checked yet)`, overlap_months: null });
   }
 
-  const byTargetFirst = (a: object, b: object) => Number((b as { at_target?: boolean }).at_target ?? 0) - Number((a as { at_target?: boolean }).at_target ?? 0);
-  const enriched = conns.filter((c) => c.enriched_at).length;
+  const byTargetFirst = (a: Person, b: Person) => Number(b.at_target ?? 0) - Number(a.at_target ?? 0);
   return {
     coverage: {
       connections: conns.length,
-      enriched_with_work_history: enriched,
-      note: enriched < conns.length
-        ? "Ex-coworker and introducer detection only covers enriched connections. Call request_enrichment for people you want checked first."
-        : undefined,
+      enriched_with_work_history: conns.filter((c) => c.enriched_at).length,
+      company_searches: companyHits.length,
     },
     buckets: Object.fromEntries(
-      Object.entries(buckets).map(([k, v]) => [k, { total: v.length, people: [...v].sort(byTargetFirst).slice(0, limit) }]),
+      Object.entries(buckets).map(([k, v]) => [k, { total: v.size, people: [...v.values()].sort(byTargetFirst).slice(0, limit) }]),
     ),
   };
 }

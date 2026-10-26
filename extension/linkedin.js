@@ -139,3 +139,78 @@ export async function myPublicId() {
   if (!mini) throw new Error("Could not read your LinkedIn profile.");
   return mini.publicIdentifier;
 }
+
+// ---- Search (server-rendered pages, so we load them in our own background tab) ----
+
+async function ownTab() {
+  if (ownTabId !== null) {
+    try { await chrome.tabs.get(ownTabId); return ownTabId; } catch { ownTabId = null; }
+  }
+  const tab = await chrome.tabs.create({ url: "about:blank", active: false, pinned: true });
+  ownTabId = tab.id;
+  return ownTabId;
+}
+
+async function loadInOwnTab(url) {
+  lastUsed = Date.now();
+  const tabId = await ownTab();
+  await chrome.tabs.update(tabId, { url });
+  await new Promise((resolve) => {
+    const onUpdated = (id, info) => {
+      if (id === tabId && info.status === "complete") { chrome.tabs.onUpdated.removeListener(onUpdated); resolve(); }
+    };
+    chrome.tabs.onUpdated.addListener(onUpdated);
+  });
+  return tabId;
+}
+
+// Runs in the page: waits for results to render, returns hrefs of the result cards.
+async function collectResults(kind) {
+  const sel = kind === "people" ? 'main a[href*="/in/"]' : 'main a[href*="/company/"]';
+  for (let i = 0; i < 20; i++) {
+    const cards = [...document.querySelectorAll(sel)].filter((a) => a.hasAttribute("componentkey") || a.querySelector("img"));
+    if (cards.length) return cards.map((a) => a.getAttribute("href"));
+    if (/no results found/i.test(document.querySelector("main")?.innerText || "")) return [];
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return [];
+}
+
+async function searchPage(url, kind) {
+  const tabId = await loadInOwnTab(url);
+  const [{ result }] = await chrome.scripting.executeScript({ target: { tabId }, func: collectResults, args: [kind] });
+  lastUsed = Date.now();
+  return result || [];
+}
+
+/** Company name -> LinkedIn company id, via company search + company lookup. */
+export async function resolveCompanyId(name) {
+  const hrefs = await searchPage(`${ORIGIN}/search/results/companies/?keywords=${encodeURIComponent(name)}`, "companies");
+  const slug = hrefs.map((h) => h.match(/\/company\/([^/?#]+)/)?.[1]).find(Boolean);
+  if (!slug) throw new Error(`company not found: ${name}`);
+  const j = await voyager(
+    `/voyager/api/organization/companies?decorationId=com.linkedin.voyager.deco.organization.web.WebFullCompanyMain-12&q=universalName&universalName=${encodeURIComponent(slug)}`,
+  );
+  const urn = j.data?.["*elements"]?.[0];
+  const id = urn?.match(/(\d+)$/)?.[1];
+  if (!id) throw new Error(`company id not found: ${name}`);
+  const company = (j.included || []).find((i) => i.entityUrn === urn);
+  return { id, name: company?.name || name };
+}
+
+/** Public ids of 1st-degree connections who currently (or previously) worked at a company. */
+export async function connectionsAtCompany(companyId, relation, maxPages = 10) {
+  const facet = relation === "current" ? "currentCompany" : "pastCompany";
+  const ids = new Set();
+  for (let page = 1; page <= maxPages; page++) {
+    const url = `${ORIGIN}/search/results/people/?origin=FACETED_SEARCH&network=%5B%22F%22%5D&${facet}=%5B%22${companyId}%22%5D&page=${page}`;
+    const before = ids.size;
+    for (const href of await searchPage(url, "people")) {
+      const id = href.match(/\/in\/([^/?#]+)/)?.[1];
+      if (id) ids.add(decodeURIComponent(id));
+    }
+    if (ids.size - before < 10) break; // last page
+    await jitter(2500, 5000);
+  }
+  return [...ids];
+}

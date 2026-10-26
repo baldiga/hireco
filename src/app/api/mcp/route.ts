@@ -2,12 +2,14 @@ import type { AuthInfo } from "@modelcontextprotocol/server";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
 import { verifyApiKey } from "@/lib/apiKeys";
+import { companyIdFromUrn, runSearches, type CompanySpec } from "@/lib/companySearch";
 import { findHiringPaths, loadConnections, loadProfile, profileUrl, searchNetwork } from "@/lib/network";
 import { welcome } from "@/lib/onboarding";
 import { getStatus } from "@/lib/status";
 import { adminClient } from "@/lib/supabase/admin";
 
-export const maxDuration = 60;
+// Tools may wait on the extension's live LinkedIn searches.
+export const maxDuration = 120;
 
 const INSTRUCTIONS = `Hireco maps the user's own LinkedIn network to find people who can get them hired.
 Data comes from the user's Hireco browser extension, which syncs their 1st-degree connections and gradually enriches them with full work history.
@@ -106,8 +108,56 @@ const handler = createMcpHandler(
       },
       async (args, ctx) => {
         const id = userId(ctx);
-        const [conns, me] = await Promise.all([loadConnections(id), loadProfile(id)]);
-        return json(findHiringPaths(conns, me, args));
+        const me = await loadProfile(id);
+        // LinkedIn searches: my companies (ex-coworkers) and target companies (insiders, introducers).
+        const myCompanies = [...new Map((me?.positions ?? []).filter((p) => p.company).map((p) => [p.company!, p])).values()].slice(0, 8);
+        const specs: CompanySpec[] = [
+          ...(args.target_companies ?? []).flatMap((company) => (["current", "past"] as const).map((relation) => ({ company, relation }))),
+          ...myCompanies.flatMap((p) => (["current", "past"] as const).map((relation) => ({ company: p.company!, companyId: companyIdFromUrn(p.companyUrn), relation }))),
+        ];
+        const [conns, searches] = await Promise.all([loadConnections(id), runSearches(id, specs)]);
+        const result = findHiringPaths(conns, me, args, searches.results.filter((r) => r.status === "done"));
+        return json({
+          ...result,
+          ...(searches.pending
+            ? { still_running: `${searches.pending} LinkedIn company searches are still running in the user's browser (it must be open with the Hireco extension). Call find_hiring_paths again in a minute for complete results.` }
+            : {}),
+        });
+      },
+    );
+
+    server.registerTool(
+      "find_people_at_company",
+      {
+        title: "Find people at a company",
+        description: "Live LinkedIn search (via the user's extension) for the user's 1st-degree connections who currently work and/or used to work at a company. Takes up to ~1 minute; the browser must be open.",
+        inputSchema: z.object({
+          company: z.string(),
+          relation: z.enum(["current", "past", "both"]).optional().describe("Default: both"),
+        }),
+        annotations: { readOnlyHint: true },
+      },
+      async ({ company, relation = "both" }, ctx) => {
+        const id = userId(ctx);
+        const relations = relation === "both" ? (["current", "past"] as const) : [relation];
+        const [conns, searches] = await Promise.all([
+          loadConnections(id),
+          runSearches(id, relations.map((r) => ({ company, relation: r }))),
+        ]);
+        const byId = new Map(conns.map((c) => [c.public_id, c]));
+        return json({
+          ...(searches.pending ? { still_running: "Search is still running in the user's browser. Call again in a minute." } : {}),
+          results: searches.results.map((r) => ({
+            relation: r.relation,
+            status: r.status,
+            people: r.public_ids.map((pid) => {
+              const c = byId.get(pid);
+              return c
+                ? { name: [c.first_name, c.last_name].filter(Boolean).join(" "), url: profileUrl(pid), headline: c.headline }
+                : { url: profileUrl(pid), note: "not in synced connections yet — run Sync" };
+            }),
+          })),
+        });
       },
     );
 

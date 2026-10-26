@@ -1,5 +1,5 @@
 import { SERVER } from "./config.js";
-import { closeIdleTab, connectionsPage, fullProfile, jitter, myPublicId } from "./linkedin.js";
+import { closeIdleTab, connectionsAtCompany, connectionsPage, fullProfile, jitter, myPublicId, resolveCompanyId } from "./linkedin.js";
 
 // Pacing: keep traffic close to a person browsing LinkedIn.
 const ENRICH_EVERY_MIN = 2;
@@ -89,7 +89,40 @@ async function enrichTick() {
   }
 }
 
+// Company searches requested by the AI agent (find_hiring_paths / find_people_at_company).
+let runningJobs = false;
+
+async function runJobs() {
+  const s = await getState();
+  if (runningJobs || !s.apiKey) return;
+  runningJobs = true;
+  try {
+    for (;;) {
+      const { jobs } = await api("/api/ext/jobs");
+      if (!jobs.length) break;
+      for (const job of jobs) {
+        try {
+          await setState({ progress: `Searching ${job.company_name} (${job.relation})…` });
+          const company = job.company_id ? { id: job.company_id, name: job.company_name } : await resolveCompanyId(job.company_name);
+          const public_ids = await connectionsAtCompany(company.id, job.relation);
+          await post("/api/ext/jobs", { id: job.id, company_id: company.id, public_ids });
+        } catch (e) {
+          await post("/api/ext/jobs", { id: job.id, error: e.message });
+          if (/rate limit|signed in/i.test(e.message)) throw e;
+        }
+        await jitter(2000, 4000);
+      }
+    }
+    await setState({ progress: null });
+  } catch (e) {
+    await setState({ lastError: e.message, progress: null });
+  } finally {
+    runningJobs = false;
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
+  chrome.alarms.create("jobs", { periodInMinutes: 0.5 });
   chrome.alarms.create("enrich", { periodInMinutes: ENRICH_EVERY_MIN });
   chrome.alarms.create("daily-sync", { periodInMinutes: 24 * 60 });
 });
@@ -97,6 +130,7 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.alarms.onAlarm.addListener(async ({ name }) => {
   const s = await getState();
   if (s.enrichPaused && s.resumeAt && Date.now() > s.resumeAt) await setState({ enrichPaused: false, resumeAt: null });
+  if (name === "jobs") await runJobs();
   if (name === "enrich") await enrichTick();
   if (name === "daily-sync" && s.apiKey) await syncConnections();
   await closeIdleTab();
