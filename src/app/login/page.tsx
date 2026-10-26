@@ -1,48 +1,32 @@
 "use client";
 
-import { createBrowserClient } from "@supabase/ssr";
-import { useState } from "react";
+import Link from "next/link";
+import { useActionState } from "react";
+import { requestSignIn, type FormState } from "@/app/actions";
+import { Wordmark } from "@/components/Brand";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [error, setError] = useState("");
-
-  async function send(e: React.FormEvent) {
-    e.preventDefault();
-    setState("sending");
-    const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${location.origin}/auth/callback` },
-    });
-    if (error) {
-      setError(error.message);
-      setState("error");
-    } else setState("sent");
-  }
+  const [state, action, pending] = useActionState<FormState, FormData>(requestSignIn, null);
 
   return (
-    <main className="mx-auto w-full max-w-sm px-6 py-24">
-      <h1 className="text-2xl font-semibold">Sign in to Hireco</h1>
-      {state === "sent" ? (
-        <p className="mt-4 text-neutral-500">Check <b>{email}</b> for a sign-in link.</p>
-      ) : (
-        <form onSubmit={send} className="mt-6 flex flex-col gap-3">
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            className="rounded-lg border border-neutral-300 bg-transparent px-3 py-2 dark:border-neutral-700"
-          />
-          <button disabled={state === "sending"} className="rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700 disabled:opacity-60">
-            {state === "sending" ? "Sending…" : "Email me a sign-in link"}
-          </button>
-          {state === "error" && <p className="text-sm text-red-500">{error}</p>}
-        </form>
-      )}
+    <main className="flex min-h-screen flex-col items-center justify-center px-6 py-16">
+      <div className="rise d1 mb-10"><Wordmark /></div>
+      <div className="rise d2 panel panel-hi w-full max-w-md p-8 sm:p-10">
+        <h1 className="font-display text-4xl font-light text-white">Welcome back.</h1>
+        <p className="mt-2 text-mist">We&apos;ll email you a one-time sign-in link.</p>
+        {state?.ok ? (
+          <div className="mt-8 rounded-2xl border border-glint/30 bg-glint/[0.06] p-5 text-frost">{state.message}</div>
+        ) : (
+          <form action={action} className="mt-8 grid gap-3">
+            <input name="email" type="email" required placeholder="you@example.com" autoComplete="email" className="field" />
+            <button disabled={pending} className="btn-primary w-full">{pending ? "Sending…" : "Email me a sign-in link"}</button>
+            {state && !state.ok && <p className="text-sm text-[#ff9aa8]">{state.message}</p>}
+          </form>
+        )}
+      </div>
+      <p className="rise d3 mt-8 text-sm text-mist">
+        New here? <Link href="/#early" className="text-ice underline decoration-white/20 underline-offset-4">Request early access</Link>
+      </p>
     </main>
   );
 }

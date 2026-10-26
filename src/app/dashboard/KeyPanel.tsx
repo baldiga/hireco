@@ -1,42 +1,59 @@
 "use client";
 
 import { useState } from "react";
+import CopyBlock from "@/components/CopyBlock";
 import { generateKey } from "./actions";
 
-export default function KeyPanel({ origin }: { origin: string }) {
+// Step 3 (key) and step 5 (connect your AI) share the generated key.
+export default function KeyPanel({ origin, hasKey, children }: { origin: string; hasKey: boolean; children: React.ReactNode }) {
   const [key, setKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const shown = key ?? "hk_YOUR_KEY";
   const mcpUrl = `${origin}/api/mcp`;
-  const shownKey = key ?? "hk_YOUR_KEY";
 
   return (
-    <section className="mt-10 rounded-xl border border-emerald-600/40 p-5">
-      <h2 className="text-lg font-semibold">Your API key</h2>
-      <p className="mt-1 text-sm text-neutral-500">Used by both the extension and your AI client. Shown once — store it somewhere safe.</p>
-      {key ? (
-        <code className="mt-3 block break-all rounded-lg bg-neutral-100 p-3 text-sm dark:bg-neutral-900">{key}</code>
-      ) : (
-        <button
-          disabled={busy}
-          onClick={async () => { setBusy(true); setKey(await generateKey()); setBusy(false); }}
-          className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-        >
-          {busy ? "Generating…" : "Generate API key"}
-        </button>
-      )}
+    <>
+      <Step n="03" title="Get your API key" done={hasKey || !!key}>
+        <p className="text-mist">The extension and your AI both use it. It&apos;s shown once — keep it somewhere safe.</p>
+        {key ? (
+          <div className="mt-4"><CopyBlock text={key} /></div>
+        ) : (
+          <button
+            disabled={busy}
+            onClick={async () => { setBusy(true); setKey(await generateKey()); setBusy(false); }}
+            className="btn-primary mt-4"
+          >
+            {busy ? "Generating…" : hasKey ? "Generate a new key" : "Generate API key"}
+          </button>
+        )}
+        <p className="mt-4 text-sm text-mist">Then open the Hireco extension, paste the key and press <b className="font-normal text-frost">Sync now</b>.</p>
+      </Step>
 
-      <h3 className="mt-6 font-semibold">2 · Connect your AI</h3>
-      <p className="mt-1 text-sm text-neutral-500">
-        Then ask Claude <i>“Get started with Hireco”</i>. More prompts and a Claude skill: <a href="/guide" className="underline">Guide</a>.
-      </p>
-      <p className="mt-3 text-sm font-medium">Claude Code</p>
-      <code className="mt-1 block break-all rounded-lg bg-neutral-100 p-3 text-xs dark:bg-neutral-900">
-        claude mcp add --transport http hireco {mcpUrl} --header &quot;Authorization: Bearer {shownKey}&quot;
-      </code>
-      <p className="mt-3 text-sm font-medium">Codex / Cursor / other MCP clients</p>
-      <code className="mt-1 block whitespace-pre break-all rounded-lg bg-neutral-100 p-3 text-xs dark:bg-neutral-900">
-        {JSON.stringify({ mcpServers: { hireco: { url: mcpUrl, headers: { Authorization: `Bearer ${shownKey}` } } } }, null, 2)}
-      </code>
+      {children}
+
+      <Step n="05" title="Connect your AI" id="connect">
+        <div className="grid gap-5">
+          <CopyBlock label="Claude Code" text={`claude mcp add --transport http hireco ${mcpUrl} --header "Authorization: Bearer ${shown}"`} />
+          <CopyBlock
+            label="Codex · Cursor · other MCP clients"
+            text={JSON.stringify({ mcpServers: { hireco: { url: mcpUrl, headers: { Authorization: `Bearer ${shown}` } } } }, null, 2)}
+          />
+        </div>
+      </Step>
+    </>
+  );
+}
+
+export function Step({ n, title, done, id, children }: { n: string; title: string; done?: boolean; id?: string; children: React.ReactNode }) {
+  return (
+    <section id={id} className="panel scroll-mt-8 p-7 sm:p-8">
+      <div className="flex items-center gap-4">
+        <span className={`grid h-10 w-10 place-items-center rounded-full border text-sm ${done ? "border-glint/60 bg-glint/10 text-glint" : "border-[var(--line-strong)] text-ice"}`}>
+          {done ? "✓" : n}
+        </span>
+        <h2 className="font-display text-2xl font-normal text-white">{title}</h2>
+      </div>
+      <div className="mt-5 sm:pl-14">{children}</div>
     </section>
   );
 }

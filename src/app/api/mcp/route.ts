@@ -3,31 +3,21 @@ import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
 import { verifyApiKey } from "@/lib/apiKeys";
 import { companyIdFromUrn, runSearches, type CompanySpec } from "@/lib/companySearch";
+import { enrichProspects, MAX_PER_CALL } from "@/lib/enrich";
+import { saveExport, type ExportRow } from "@/lib/exports";
 import { findHiringPaths, loadConnections, loadProfile, profileUrl, searchNetwork } from "@/lib/network";
-import { welcome } from "@/lib/onboarding";
+import { INSTRUCTIONS, welcome } from "@/lib/onboarding";
 import { getStatus } from "@/lib/status";
 import { adminClient } from "@/lib/supabase/admin";
 
-// Tools may wait on the extension's live LinkedIn searches.
-export const maxDuration = 120;
-
-const INSTRUCTIONS = `Hireco maps the user's own LinkedIn network to find people who can get them hired.
-Data comes from the user's Hireco browser extension, which syncs their 1st-degree connections and gradually enriches them with full work history.
-
-If the user is new to Hireco, asks what it can do, or this is the first Hireco use in the conversation, call get_started and follow its how_to_present_this_to_the_user steps (including the example map artifact).
-
-Typical flow:
-1. get_sync_status — check data is there. If connections = 0, tell the user to install the extension and press "Sync now".
-2. Understand the target: read the user's CV / ask for target role, function, seniority, companies, location. get_my_profile gives their LinkedIn work history.
-3. find_hiring_paths with role_keywords (function words + title synonyms, e.g. ["growth","marketing","demand gen"]) and target_companies.
-4. Use search_my_network for follow-ups (a specific company, title, or keyword).
-5. Rank the best paths for the user and explain why each person matters. Draft short, personal outreach messages when asked.
-6. If key people are not enriched yet, call request_enrichment so the extension fetches their work history next.
-7. When showing results, prefer an interactive Hireco map artifact (see map_artifact_spec in get_started).`;
+// Tools may wait on the extension's live LinkedIn searches or on enrichment.
+export const maxDuration = 300;
 
 const userId = (ctx: { http?: { authInfo?: AuthInfo } }) => ctx.http?.authInfo?.extra?.userId as string;
 const json = (data: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(data, null, 1) }] });
-const publicIdOf = (s: string) => s.match(/linkedin\.com\/in\/([^/?#]+)/)?.[1] ?? s.trim();
+const publicIdOf = (s: string) => decodeURIComponent(s.match(/linkedin\.com\/in\/([^/?#]+)/)?.[1] ?? s.trim());
+
+type Person = { name: string; url: string; title: string | null; company: string | null; why: string; enriched: boolean; at_target?: boolean };
 
 const handler = createMcpHandler(
   (server) => {
@@ -35,7 +25,7 @@ const handler = createMcpHandler(
       "get_started",
       {
         title: "Get started with Hireco",
-        description: "Onboarding: what Hireco does, the user's sync status, a demo network and the spec for an example Hireco map artifact. Call when the user is new or asks what Hireco can do.",
+        description: "Onboarding: what Hireco does, the user's sync status and premium allowance, a sample result, and how to guide them. Call on first use.",
         inputSchema: z.object({}),
         annotations: { readOnlyHint: true },
       },
@@ -44,17 +34,15 @@ const handler = createMcpHandler(
 
     server.registerPrompt(
       "get-started",
-      { title: "Get started with Hireco", description: "A guided tour: what Hireco can do, with an example map" },
-      () => ({
-        messages: [{ role: "user", content: { type: "text", text: "I just connected Hireco. Call get_started, explain what you can do for me, and show me the example Hireco map." } }],
-      }),
+      { title: "Get started with Hireco", description: "What Hireco can do, with a sample result" },
+      () => ({ messages: [{ role: "user", content: { type: "text", text: "I just connected Hireco. Call get_started and walk me through what you can do for me." } }] }),
     );
 
     server.registerPrompt(
-      "hiring-map",
+      "find-paths",
       {
-        title: "Build my hiring map",
-        description: "Find who in your network can get you hired for a role",
+        title: "Find my paths in",
+        description: "Who in your network can get you hired for a role",
         argsSchema: z.object({
           role: z.string().describe("Target role, e.g. Head of Growth"),
           companies: z.string().optional().describe("Target companies, comma separated"),
@@ -63,34 +51,9 @@ const handler = createMcpHandler(
       ({ role, companies }) => ({
         messages: [{
           role: "user",
-          content: {
-            type: "text",
-            text: `I'm looking for a ${role} role${companies ? ` at ${companies}` : ""}. Check my Hireco sync status and my LinkedIn profile, run find_hiring_paths with good keywords for this role, then build my interactive Hireco map artifact and tell me the 5 best paths in, with a draft intro message for the top one.`,
-          },
+          content: { type: "text", text: `I'm looking for a ${role} role${companies ? ` at ${companies}` : ""}. Use Hireco to find who in my network can get me hired: give me the best paths in, the CSV and the map.` },
         }],
       }),
-    );
-
-    server.registerTool(
-      "get_sync_status",
-      {
-        title: "Sync status",
-        description: "How many LinkedIn connections are synced and how many have full work history. Call first.",
-        inputSchema: z.object({}),
-        annotations: { readOnlyHint: true },
-      },
-      async (_args, ctx) => json(await getStatus(userId(ctx))),
-    );
-
-    server.registerTool(
-      "get_my_profile",
-      {
-        title: "My LinkedIn profile",
-        description: "The user's own LinkedIn headline, work history and education, as synced by the extension.",
-        inputSchema: z.object({}),
-        annotations: { readOnlyHint: true },
-      },
-      async (_args, ctx) => json(await loadProfile(userId(ctx))),
     );
 
     server.registerTool(
@@ -98,65 +61,53 @@ const handler = createMcpHandler(
       {
         title: "Find hiring paths",
         description:
-          "Sorts the user's connections into buckets: hiring_managers, decision_makers, insiders (at target companies), recruiters, introducers (used to work at target companies) and ex_coworkers.",
+          "Main tool. Maps the user's connections into hiring_managers, decision_makers, insiders, recruiters, introducers and ex_coworkers for a target role (and target companies). Returns top people per bucket, csv_url, map_url, and a premium enrichment shortlist. May take up to a minute the first time a company is searched.",
         inputSchema: z.object({
-          role_keywords: z.array(z.string()).min(1).describe("Function / title keywords for the target role, e.g. ['product', 'pm'] or ['growth','marketing']"),
+          role_keywords: z.array(z.string()).min(1).describe("Function / title keywords for the target role, e.g. ['growth','marketing','acquisition']"),
           target_companies: z.array(z.string()).optional().describe("Companies the user wants to work at"),
-          limit_per_bucket: z.number().int().min(1).max(100).optional(),
+          title: z.string().optional().describe("Short label for the export, e.g. 'Head of Growth — Stripe, Monday.com'"),
+          limit_per_bucket: z.number().int().min(1).max(50).optional().describe("People per bucket in this response (default 10). The CSV has everyone."),
         }),
         annotations: { readOnlyHint: true },
       },
       async (args, ctx) => {
         const id = userId(ctx);
         const me = await loadProfile(id);
-        // LinkedIn searches: my companies (ex-coworkers) and target companies (insiders, introducers).
         const myCompanies = [...new Map((me?.positions ?? []).filter((p) => p.company).map((p) => [p.company!, p])).values()].slice(0, 8);
         const specs: CompanySpec[] = [
           ...(args.target_companies ?? []).flatMap((company) => (["current", "past"] as const).map((relation) => ({ company, relation }))),
           ...myCompanies.flatMap((p) => (["current", "past"] as const).map((relation) => ({ company: p.company!, companyId: companyIdFromUrn(p.companyUrn), relation }))),
         ];
-        const [conns, searches] = await Promise.all([loadConnections(id), runSearches(id, specs)]);
-        const result = findHiringPaths(conns, me, args, searches.results.filter((r) => r.status === "done"));
-        return json({
-          ...result,
-          ...(searches.pending
-            ? { still_running: `${searches.pending} LinkedIn company searches are still running in the user's browser (it must be open with the Hireco extension). Call find_hiring_paths again in a minute for complete results.` }
-            : {}),
-        });
-      },
-    );
+        const [conns, searches, status] = await Promise.all([loadConnections(id), runSearches(id, specs), getStatus(id)]);
+        // Everyone goes into the export; the response is trimmed below.
+        const full = findHiringPaths(conns, me, { ...args, limit_per_bucket: 1000 }, searches.results.filter((r) => r.status === "done"));
+        const buckets = full.buckets as Record<string, { total: number; people: Person[] }>;
 
-    server.registerTool(
-      "find_people_at_company",
-      {
-        title: "Find people at a company",
-        description: "Live LinkedIn search (via the user's extension) for the user's 1st-degree connections who currently work and/or used to work at a company. Takes up to ~1 minute; the browser must be open.",
-        inputSchema: z.object({
-          company: z.string(),
-          relation: z.enum(["current", "past", "both"]).optional().describe("Default: both"),
-        }),
-        annotations: { readOnlyHint: true },
-      },
-      async ({ company, relation = "both" }, ctx) => {
-        const id = userId(ctx);
-        const relations = relation === "both" ? (["current", "past"] as const) : [relation];
-        const [conns, searches] = await Promise.all([
-          loadConnections(id),
-          runSearches(id, relations.map((r) => ({ company, relation: r }))),
-        ]);
-        const byId = new Map(conns.map((c) => [c.public_id, c]));
+        const rows: ExportRow[] = Object.entries(buckets).flatMap(([bucket, b]) =>
+          b.people.map((p) => ({ bucket, name: p.name, title: p.title, company: p.company, url: p.url, why: p.why, enriched: p.enriched })),
+        );
+        const title = args.title ?? [args.role_keywords.join(", "), args.target_companies?.join(", ")].filter(Boolean).join(" — ");
+        const links = await saveExport(id, title, rows);
+
+        // Who is worth spending premium enrichment on, best first.
+        const seen = new Set<string>();
+        const shortlist = (["insiders", "hiring_managers", "decision_makers", "introducers", "ex_coworkers", "recruiters"] as const)
+          .flatMap((k) => buckets[k].people.filter((p) => !p.enriched).map((p) => ({ url: p.url, name: p.name, bucket: k, why: p.why })))
+          .filter((p) => !seen.has(p.url) && seen.add(p.url))
+          .slice(0, Math.min(status.premium_enrichment.remaining, MAX_PER_CALL));
+
+        const limit = args.limit_per_bucket ?? 10;
         return json({
-          ...(searches.pending ? { still_running: "Search is still running in the user's browser. Call again in a minute." } : {}),
-          results: searches.results.map((r) => ({
-            relation: r.relation,
-            status: r.status,
-            people: r.public_ids.map((pid) => {
-              const c = byId.get(pid);
-              return c
-                ? { name: [c.first_name, c.last_name].filter(Boolean).join(" "), url: profileUrl(pid), headline: c.headline }
-                : { url: profileUrl(pid), note: "not in synced connections yet — run Sync" };
-            }),
-          })),
+          ...(searches.pending ? { still_running: `${searches.pending} LinkedIn company searches are still running in the user's browser. Call again in about a minute for complete results.` } : {}),
+          coverage: full.coverage,
+          buckets: Object.fromEntries(Object.entries(buckets).map(([k, b]) => [k, { total: b.total, people: b.people.slice(0, limit) }])),
+          csv_url: links.csv_url,
+          map_url: links.map_url,
+          premium_enrichment: {
+            ...status.premium_enrichment,
+            enrichment_shortlist: shortlist,
+            note: shortlist.length ? "Ask the user before calling enrich_prospects with (part of) this shortlist." : undefined,
+          },
         });
       },
     );
@@ -165,18 +116,42 @@ const handler = createMcpHandler(
       "search_my_network",
       {
         title: "Search my network",
-        description: "Filter the user's connections by free text, company, title keywords or seniority. Comma-separate alternatives (e.g. title: 'cto, vp engineering').",
+        description: "Filter the user's connections by free text, company, title keywords or seniority (comma-separate alternatives, e.g. title: 'cto, vp engineering'). Returns matches plus csv_url and map_url.",
         inputSchema: z.object({
           query: z.string().optional().describe("Free text across name, headline, title, company and past positions"),
           company: z.string().optional(),
-          include_past: z.boolean().optional().describe("Also match people who used to work at `company`"),
+          include_past: z.boolean().optional().describe("Also match people who used to work at `company` (needs enriched history)"),
           title: z.string().optional(),
           seniority: z.array(z.enum(["c_level", "vp", "head", "director", "manager", "ic"])).optional(),
           limit: z.number().int().min(1).max(200).optional(),
         }),
         annotations: { readOnlyHint: true },
       },
-      async (args, ctx) => json(searchNetwork(await loadConnections(userId(ctx)), args)),
+      async (args, ctx) => {
+        const id = userId(ctx);
+        const conns = await loadConnections(id);
+        const all = searchNetwork(conns, { ...args, limit: 1000 });
+        const label = [args.query, args.company, args.title, args.seniority?.join("/")].filter(Boolean).join(" · ") || "Network search";
+        const links = await saveExport(
+          id,
+          label,
+          all.results.map((p) => ({ bucket: "search", name: p.name, title: p.title, company: p.company, url: p.url, why: p.headline ?? "", enriched: p.enriched })),
+        );
+        return json({ total: all.total, results: all.results.slice(0, args.limit ?? 50), ...links });
+      },
+    );
+
+    server.registerTool(
+      "enrich_prospects",
+      {
+        title: "Enrich prospects (premium)",
+        description: `Premium: fetches exact titles and full dated work history for chosen connections. Each new person uses 1 prospect from the user's allowance (already-enriched people are free). Max ${MAX_PER_CALL} per call. Only call after the user approves the list.`,
+        inputSchema: z.object({ profiles: z.array(z.string()).min(1).max(MAX_PER_CALL).describe("LinkedIn profile URLs or public ids") }),
+      },
+      async ({ profiles }, ctx) => {
+        const result = await enrichProspects(userId(ctx), profiles.map(publicIdOf));
+        return json({ ...result, next: "Re-run find_hiring_paths to see updated buckets with exact titles and ex-coworker overlap." });
+      },
     );
 
     server.registerTool(
@@ -197,27 +172,8 @@ const handler = createMcpHandler(
         return json(data ? { ...data, url: profileUrl(data.public_id) } : { error: "Not one of the user's synced connections." });
       },
     );
-
-    server.registerTool(
-      "request_enrichment",
-      {
-        title: "Request enrichment",
-        description: "Moves these connections to the front of the extension's queue so their full work history is fetched next (a few per minute while the browser is open).",
-        inputSchema: z.object({ profiles: z.array(z.string()).min(1).max(100).describe("LinkedIn profile URLs or public ids") }),
-      },
-      async ({ profiles }, ctx) => {
-        const { data, error } = await adminClient()
-          .from("connections")
-          .update({ enrich_priority: 10, enrich_error: null })
-          .eq("user_id", userId(ctx))
-          .in("public_id", profiles.map(publicIdOf))
-          .select("public_id");
-        if (error) throw error;
-        return json({ queued: data.length, not_found: profiles.length - data.length });
-      },
-    );
   },
-  { serverInfo: { name: "hireco", version: "0.1.0" }, instructions: INSTRUCTIONS },
+  { serverInfo: { name: "hireco", version: "0.4.0" }, instructions: INSTRUCTIONS },
 );
 
 const verifyToken = async (_req: Request, token?: string): Promise<AuthInfo | undefined> => {

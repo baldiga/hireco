@@ -2,52 +2,48 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <style>
-    body { width: 320px; margin: 0; padding: 16px; font: 13px system-ui, sans-serif; color: #171717; }
-    h1 { font-size: 16px; margin: 0 0 12px; color: #059669; }
-    h2 { font-size: 15px; margin: 0; }
-    label { display: block; margin-top: 8px; color: #555; }
-    input { width: 100%; box-sizing: border-box; padding: 6px 8px; margin-top: 2px; border: 1px solid #ccc; border-radius: 6px; }
-    button, .btn { display: block; box-sizing: border-box; text-align: center; text-decoration: none; margin-top: 10px; width: 100%; padding: 8px; border: 0; border-radius: 6px; background: #059669; color: #fff; font: 600 13px system-ui, sans-serif; cursor: pointer; }
-    button.secondary { background: #e5e5e5; color: #171717; }
-    button:disabled { opacity: .6; }
-    .stats { margin-top: 12px; padding: 10px; background: #f5f5f5; border-radius: 6px; line-height: 1.6; }
-    .err { color: #dc2626; margin-top: 8px; }
-    .muted { color: #777; }
-    .row { display: flex; gap: 8px; } .row button { flex: 1; }
-    ol { margin: 10px 0 0; padding-left: 18px; line-height: 1.6; }
-    a.link { color: #777; font-size: 12px; cursor: pointer; text-decoration: underline; }
-    [hidden] { display: none !important; }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Hanken+Grotesk:wght@300;400;500&display=swap" />
+  <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <h1>Hireco</h1>
+  <div class="glow"></div>
+  <header>
+    <span class="mark" aria-hidden="true"></span>
+    <span class="word">Hireco</span>
+    <span class="badge">Early access</span>
+  </header>
 
-  <div id="setup" hidden>
+  <section id="setup" hidden>
+    <h1>Connect your <em>network</em></h1>
     <p class="muted">Paste the API key from your <a id="dash" href="#">Hireco dashboard</a>.</p>
-    <label>API key <input id="apiKey" type="password" placeholder="hk_…" /></label>
-    <button id="save">Connect</button>
-  </div>
+    <input id="apiKey" type="password" placeholder="hk_…" autocomplete="off" />
+    <button id="save" class="primary">Connect</button>
+  </section>
 
-  <div id="main" hidden>
-    <h2 id="hello">Hello 👋</h2>
-    <div class="muted" id="email"></div>
-    <div class="stats" id="stats"></div>
-    <div class="muted" id="progress"></div>
-    <ol id="steps">
-      <li id="step-sync">Press <b>Sync now</b> to import your connections.</li>
-      <li>Add Hireco to Claude (instructions on the dashboard).</li>
-      <li>Ask Claude: <i>“Get started with Hireco”</i>.</li>
-    </ol>
-    <div class="row">
-      <button id="sync">Sync now</button>
-      <button id="pause" class="secondary">Pause enrich</button>
+  <section id="main" hidden>
+    <h1 id="hello">Hello</h1>
+    <p class="muted" id="email"></p>
+
+    <div class="stats">
+      <div><span class="num" id="conns">—</span><span class="lbl">connections</span></div>
+      <div><span class="num" id="quota">—</span><span class="lbl">premium prospects left</span></div>
     </div>
-    <a class="btn" id="guide" href="#">Skills &amp; prompts for Claude →</a>
-    <p><a class="link" id="change">Change API key</a></p>
-  </div>
 
-  <div class="err" id="error"></div>
+    <p class="progress" id="progress"></p>
+    <button id="sync" class="primary">Sync now</button>
+
+    <ol class="steps">
+      <li id="s1"><span></span>Sync your connections</li>
+      <li id="s2"><span></span>Add Hireco to Claude <a id="howto" href="#">how</a></li>
+      <li id="s3"><span></span>Ask Claude: <i>“Get started with Hireco”</i></li>
+    </ol>
+
+    <button id="guide" class="ghost">Skills &amp; prompts for Claude →</button>
+    <p class="foot"><a id="change" href="#">Change key</a></p>
+  </section>
+
+  <p class="err" id="error"></p>
   <script src="popup.js" type="module"></script>
 </body>
 </html>
