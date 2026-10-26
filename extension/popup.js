@@ -30,7 +30,80 @@ async function render() {
   $("sync").textContent = s.syncing ? "Syncing…" : st.connections ? "Sync again" : "Sync now";
   $("s1").classList.toggle("done", st.connections > 0);
   $("s2").classList.toggle("done", !!s.claudeConnected);
+  if (st.connections > 0) renderMaps(s.apiKey);
 }
+
+// ---- My maps (kept for 14 days) ----
+
+let showAll = false;
+const DAY = 86400_000;
+const ago = (iso) => {
+  const d = Math.floor((Date.now() - Date.parse(iso)) / DAY);
+  if (d >= 1) return d === 1 ? "yesterday" : `${d} days ago`;
+  const h = Math.floor((Date.now() - Date.parse(iso)) / 3600_000);
+  return h >= 1 ? `${h}h ago` : "just now";
+};
+
+function mapItem(m) {
+  const li = document.createElement("li");
+  li.className = "map-item";
+  li.title = "Open map";
+  li.onclick = () => chrome.tabs.create({ url: m.map_url });
+
+  const title = document.createElement("span");
+  title.className = "map-title";
+  title.textContent = m.title;
+
+  const left = Math.max(0, Math.ceil((Date.parse(m.expires_at) - Date.now()) / DAY));
+  const meta = document.createElement("span");
+  meta.className = "map-meta";
+  meta.append(`${m.people != null ? `${m.people} people · ` : ""}${ago(m.created_at)} · `);
+  const exp = document.createElement("span");
+  if (left <= 3) exp.className = "soon";
+  exp.textContent = left <= 1 ? "expires today" : `${left} days left`;
+  meta.append(exp);
+
+  const csv = document.createElement("a");
+  csv.className = "map-csv";
+  csv.href = m.csv_url;
+  csv.textContent = "CSV";
+  csv.onclick = (e) => { e.preventDefault(); e.stopPropagation(); chrome.tabs.create({ url: m.csv_url }); };
+
+  li.append(title, csv, meta);
+  return li;
+}
+
+async function renderMaps(apiKey) {
+  const res = await fetch(`${SERVER}/api/ext/maps`, { headers: { authorization: `Bearer ${apiKey}` } }).catch(() => null);
+  if (!res?.ok) return;
+  const { maps, retention_days } = await res.json();
+  $("maps").hidden = false;
+  $("maps-note").textContent = `kept ${retention_days} days`;
+  $("steps").hidden = maps.length > 0;
+
+  const list = $("map-list");
+  if (!maps.length) {
+    const empty = document.createElement("li");
+    empty.className = "empty";
+    empty.append("Your maps will appear here. Ask Claude: ");
+    const i = document.createElement("i");
+    i.textContent = "“Who can get me hired as … at …?”";
+    empty.append(i);
+    list.replaceChildren(empty);
+    $("maps-more").hidden = true;
+    return;
+  }
+  const shown = showAll ? maps : maps.slice(0, 4);
+  list.replaceChildren(...shown.map(mapItem));
+  $("maps-more").hidden = maps.length <= 4;
+  $("maps-more").textContent = showAll ? "Show fewer" : `Show all ${maps.length}`;
+}
+
+$("maps-more").onclick = async () => {
+  showAll = !showAll;
+  const { apiKey } = await chrome.storage.local.get("apiKey");
+  renderMaps(apiKey);
+};
 
 $("save").onclick = async () => {
   const apiKey = $("apiKey").value.trim();

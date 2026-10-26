@@ -31,9 +31,33 @@ export async function saveExport(userId: string, title: string, rows: ExportRow[
   return { csv_url: `${SITE_URL}/api/export/${data.id}`, map_url: `${SITE_URL}/map/${data.id}` };
 }
 
+export const RETENTION_DAYS = 14;
+const cutoff = () => new Date(Date.now() - RETENTION_DAYS * 86400_000).toISOString();
+
+/** The user's maps that haven't expired, newest first. */
+export async function listMaps(userId: string, limit = 20) {
+  const { data, error } = await adminClient()
+    .from("exports")
+    .select("id, title, created_at, people:spec->people")
+    .eq("user_id", userId)
+    .gte("created_at", cutoff())
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data.map((m) => ({
+    id: m.id as string,
+    title: m.title as string,
+    created_at: m.created_at as string,
+    people: Array.isArray(m.people) ? m.people.length : null,
+    expires_at: new Date(Date.parse(m.created_at) + RETENTION_DAYS * 86400_000).toISOString(),
+    map_url: `${SITE_URL}/map/${m.id}`,
+    csv_url: `${SITE_URL}/api/export/${m.id}`,
+  }));
+}
+
 export async function loadExport(id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
-  const { data } = await adminClient().from("exports").select("title, rows, spec, created_at").eq("id", id).maybeSingle();
+  const { data } = await adminClient().from("exports").select("title, rows, spec, created_at").eq("id", id).gte("created_at", cutoff()).maybeSingle();
   if (!data) return null;
   const rows = data.rows as ExportRow[];
   return {

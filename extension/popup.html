@@ -33,7 +33,13 @@
     <p class="progress" id="progress"></p>
     <button id="sync" class="primary">Sync now</button>
 
-    <ol class="steps">
+    <div class="maps" id="maps" hidden>
+      <div class="maps-head"><h2>My maps</h2><span class="muted small" id="maps-note">kept 14 days</span></div>
+      <ul id="map-list"></ul>
+      <button id="maps-more" class="link-btn" hidden></button>
+    </div>
+
+    <ol class="steps" id="steps">
       <li id="s1"><span></span>Sync your connections</li>
       <li id="s2"><span></span>Add Hireco to Claude <a id="howto" href="#">how</a></li>
       <li id="s3"><span></span>Ask Claude: <i>“Get started with Hireco”</i></li>
