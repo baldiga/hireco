@@ -24,5 +24,5 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Web pages only; the API and MCP routes authenticate with API keys.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|email|_next/static|_next/image|favicon.ico|icon.png).*)"],
 };

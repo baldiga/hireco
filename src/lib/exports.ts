@@ -2,7 +2,7 @@ import "server-only";
 import { autoSpec, type MapSpec } from "./mapSpec";
 import { adminClient } from "./supabase/admin";
 
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://hireco-seven.vercel.app";
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://hireco.help";
 
 export type ExportRow = {
   bucket: string;

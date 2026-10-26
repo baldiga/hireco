@@ -1,1 +1,1 @@
-export const SERVER = "https://hireco-seven.vercel.app";
+export const SERVER = "https://hireco.help";

@@ -70,7 +70,7 @@ export function TerminalMock() {
     <Window url="Terminal — claude">
       <p className="code leading-relaxed text-frost">
         <span className="text-glint">$</span> claude mcp add --transport http hireco \<br />
-        &nbsp;&nbsp;https://hireco-seven.vercel.app/api/mcp \<br />
+        &nbsp;&nbsp;https://hireco.help/api/mcp \<br />
         &nbsp;&nbsp;--header <span className="text-champagne">&quot;Authorization: Bearer hk_••••&quot;</span>
       </p>
       <p className="code mt-3 text-[#8ff0c6]">✓ Added HTTP MCP server hireco</p>
