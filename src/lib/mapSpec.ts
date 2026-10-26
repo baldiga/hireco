@@ -42,7 +42,8 @@ const GROUP_LABEL: Record<BucketType, string> = {
   ex_coworker: "Ex-coworkers", introducer: "Introducers", insider: "Insiders", hiring_manager: "Hiring managers",
   decision_maker: "Decision makers", recruiter: "Recruiters", other: "Other routes",
 };
-const WARM: BucketType[] = ["ex_coworker", "introducer", "insider", "recruiter", "other"];
+const LABEL_ORDER: BucketType[] = ["ex_coworker", "introducer", "hiring_manager", "decision_maker", "recruiter", "insider", "other"];
+const WARM: BucketType[] =["ex_coworker", "introducer", "insider", "recruiter", "other"];
 const norm = (s: string) => s.toLowerCase().replace(/\.(com|io|ai|co)\b/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
@@ -50,15 +51,19 @@ export function autoSpec(rows: Row[], opts: { title: string; me: string; targets
   const max = opts.maxPeople ?? 64;
   const targets = (opts.targets ?? []).map(norm);
 
-  // One entry per person, in their warmest bucket.
+  // One entry per person. Label by relationship, then role ("VP at target" reads better than "insider"); rank by warmth.
   const byUrl = new Map<string, MapPerson & { score: number }>();
   for (const r of rows) {
     const bucket = FROM_RESULT[r.bucket] ?? "other";
     const atTarget = r.company && targets.some((t) => norm(r.company!).includes(t) || t.includes(norm(r.company!)));
     const score = WARMTH[bucket] + (atTarget ? 2 : 0);
     const prev = byUrl.get(r.url);
-    if (!prev || score > prev.score)
-      byUrl.set(r.url, { id: `p${byUrl.size}`, name: r.name, title: r.title, company: r.company, bucket, url: r.url, why: r.why, score, ...(prev ? { id: prev.id } : {}) });
+    if (!prev) {
+      byUrl.set(r.url, { id: `p${byUrl.size}`, name: r.name, title: r.title, company: r.company, bucket, url: r.url, why: r.why, score });
+    } else {
+      if (LABEL_ORDER.indexOf(bucket) < LABEL_ORDER.indexOf(prev.bucket)) prev.bucket = bucket;
+      prev.score = Math.max(prev.score, score);
+    }
   }
   const people = [...byUrl.values()].sort((a, b) => b.score - a.score).slice(0, max);
 
@@ -106,7 +111,7 @@ export function autoSpec(rows: Row[], opts: { title: string; me: string; targets
   return {
     title: opts.title,
     me: opts.me,
-    people: people.map(({ score: _score, ...p }) => p),
+    people: people.map((p) => ({ id: p.id, name: p.name, title: p.title, company: p.company, bucket: p.bucket, url: p.url, why: p.why })),
     hubs: [...start, ...companyHubs.slice(8).map((c) => ({ ...c.hub, start: false })), ...other].slice(0, 16),
   };
 }
