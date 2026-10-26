@@ -1,3 +1,4 @@
+import { SERVER } from "./config.js";
 import { closeIdleTab, connectionsPage, fullProfile, jitter, myPublicId } from "./linkedin.js";
 
 // Pacing: keep traffic close to a person browsing LinkedIn.
@@ -11,9 +12,9 @@ const setState = (patch) => chrome.storage.local.set(patch);
 const today = () => new Date().toISOString().slice(0, 10);
 
 async function api(path, init = {}) {
-  const { server, apiKey } = await getState();
-  if (!server || !apiKey) throw new Error("Set your Hireco server URL and API key first.");
-  const res = await fetch(server.replace(/\/$/, "") + path, {
+  const { apiKey } = await getState();
+  if (!apiKey) throw new Error("Paste your Hireco API key first.");
+  const res = await fetch(SERVER + path, {
     ...init,
     headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, ...init.headers },
   });

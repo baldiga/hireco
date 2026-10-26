@@ -26,7 +26,9 @@ export default function KeyPanel({ origin }: { origin: string }) {
       )}
 
       <h3 className="mt-6 font-semibold">2 · Connect your AI</h3>
-      <p className="mt-1 text-sm text-neutral-500">Server URL for the extension: <code>{origin}</code></p>
+      <p className="mt-1 text-sm text-neutral-500">
+        Then ask Claude <i>“Get started with Hireco”</i>. More prompts and a Claude skill: <a href="/guide" className="underline">Guide</a>.
+      </p>
       <p className="mt-3 text-sm font-medium">Claude Code</p>
       <code className="mt-1 block break-all rounded-lg bg-neutral-100 p-3 text-xs dark:bg-neutral-900">
         claude mcp add --transport http hireco {mcpUrl} --header &quot;Authorization: Bearer {shownKey}&quot;

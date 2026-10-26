@@ -3,6 +3,7 @@ import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
 import { verifyApiKey } from "@/lib/apiKeys";
 import { findHiringPaths, loadConnections, loadProfile, profileUrl, searchNetwork } from "@/lib/network";
+import { welcome } from "@/lib/onboarding";
 import { getStatus } from "@/lib/status";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -11,13 +12,16 @@ export const maxDuration = 60;
 const INSTRUCTIONS = `Hireco maps the user's own LinkedIn network to find people who can get them hired.
 Data comes from the user's Hireco browser extension, which syncs their 1st-degree connections and gradually enriches them with full work history.
 
+If the user is new to Hireco, asks what it can do, or this is the first Hireco use in the conversation, call get_started and follow its how_to_present_this_to_the_user steps (including the example map artifact).
+
 Typical flow:
 1. get_sync_status — check data is there. If connections = 0, tell the user to install the extension and press "Sync now".
 2. Understand the target: read the user's CV / ask for target role, function, seniority, companies, location. get_my_profile gives their LinkedIn work history.
 3. find_hiring_paths with role_keywords (function words + title synonyms, e.g. ["growth","marketing","demand gen"]) and target_companies.
 4. Use search_my_network for follow-ups (a specific company, title, or keyword).
 5. Rank the best paths for the user and explain why each person matters. Draft short, personal outreach messages when asked.
-6. If key people are not enriched yet, call request_enrichment so the extension fetches their work history next.`;
+6. If key people are not enriched yet, call request_enrichment so the extension fetches their work history next.
+7. When showing results, prefer an interactive Hireco map artifact (see map_artifact_spec in get_started).`;
 
 const userId = (ctx: { http?: { authInfo?: AuthInfo } }) => ctx.http?.authInfo?.extra?.userId as string;
 const json = (data: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(data, null, 1) }] });
@@ -25,6 +29,46 @@ const publicIdOf = (s: string) => s.match(/linkedin\.com\/in\/([^/?#]+)/)?.[1] ?
 
 const handler = createMcpHandler(
   (server) => {
+    server.registerTool(
+      "get_started",
+      {
+        title: "Get started with Hireco",
+        description: "Onboarding: what Hireco does, the user's sync status, a demo network and the spec for an example Hireco map artifact. Call when the user is new or asks what Hireco can do.",
+        inputSchema: z.object({}),
+        annotations: { readOnlyHint: true },
+      },
+      async (_args, ctx) => json(welcome(await getStatus(userId(ctx)))),
+    );
+
+    server.registerPrompt(
+      "get-started",
+      { title: "Get started with Hireco", description: "A guided tour: what Hireco can do, with an example map" },
+      () => ({
+        messages: [{ role: "user", content: { type: "text", text: "I just connected Hireco. Call get_started, explain what you can do for me, and show me the example Hireco map." } }],
+      }),
+    );
+
+    server.registerPrompt(
+      "hiring-map",
+      {
+        title: "Build my hiring map",
+        description: "Find who in your network can get you hired for a role",
+        argsSchema: z.object({
+          role: z.string().describe("Target role, e.g. Head of Growth"),
+          companies: z.string().optional().describe("Target companies, comma separated"),
+        }),
+      },
+      ({ role, companies }) => ({
+        messages: [{
+          role: "user",
+          content: {
+            type: "text",
+            text: `I'm looking for a ${role} role${companies ? ` at ${companies}` : ""}. Check my Hireco sync status and my LinkedIn profile, run find_hiring_paths with good keywords for this role, then build my interactive Hireco map artifact and tell me the 5 best paths in, with a draft intro message for the top one.`,
+          },
+        }],
+      }),
+    );
+
     server.registerTool(
       "get_sync_status",
       {

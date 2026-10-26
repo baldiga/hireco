@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Hireco",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Syncs your LinkedIn connections to Hireco so your AI agent can find who can get you hired.",
   "permissions": ["storage", "alarms", "scripting", "tabs"],
   "host_permissions": [
     "https://www.linkedin.com/*",
-    "https://*.vercel.app/*",
+    "https://hireco-seven.vercel.app/*",
     "http://localhost:3000/*"
   ],
   "background": { "service_worker": "background.js", "type": "module" },

@@ -49,7 +49,7 @@ export default async function Dashboard() {
         <ol className="mt-2 list-decimal space-y-1 pl-5 text-neutral-600 dark:text-neutral-400">
           <li>Open <code>chrome://extensions</code>, turn on <b>Developer mode</b>.</li>
           <li>Click <b>Load unpacked</b> and pick the <code>extension</code> folder from the Hireco repo.</li>
-          <li>Open the Hireco extension, paste your server URL and API key, press <b>Sync now</b>.</li>
+          <li>Open the Hireco extension, paste your API key, press <b>Sync now</b>.</li>
         </ol>
       </section>
     </main>
