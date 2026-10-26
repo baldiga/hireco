@@ -1,0 +1,74 @@
+/* Hireco radar map. Scope furniture (rings, bezel ticks, sweep), hubs on the inner ring, people on the outer ring. */
+.hr {
+  --hr-ink: #eef3ff;
+  --hr-muted: #8a99c6;
+  --hr-line: rgba(160, 185, 255, 0.2);
+  --hr-faint: rgba(160, 185, 255, 0.1);
+  --hr-surface: #0a1433;
+  --ex_coworker: #7fe3ff;
+  --introducer: #9ff0d0;
+  --insider: #f2c46b;
+  --hiring_manager: #8fb0ff;
+  --decision_maker: #e6ecff;
+  --recruiter: #ff8fbd;
+  --other: #b49cff;
+  display: grid;
+  gap: 22px;
+}
+.hr-stage { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "map" "card" "key"; align-items: start; }
+.hr-scope { grid-area: map; min-width: 0; padding: 12px; }
+.hr-card { grid-area: card; min-width: 0; padding: 20px 22px; min-height: 190px; max-height: 340px; overflow: auto; }
+.hr-key { grid-area: key; min-width: 0; }
+@media (min-width: 980px) {
+  .hr-stage { grid-template-columns: minmax(0, 1fr) 330px; grid-template-areas: "map card" "key card"; grid-template-rows: auto 1fr; }
+  .hr-card { position: sticky; top: 16px; min-height: 440px; max-height: calc(100vh - 32px); }
+}
+.hr-wrap { width: 100%; display: flex; justify-content: center; }
+.hr svg { display: block; max-width: 100%; height: auto; }
+.hr svg text { font-family: var(--font-sans); }
+
+.hr .rim { fill: none; stroke: var(--hr-line); }
+.hr .tick { fill: none; stroke: var(--hr-line); }
+.hr .guide { fill: none; stroke: var(--hr-faint); stroke-dasharray: 2 5; }
+.hr .sweep { animation: hr-spin 18s linear infinite; transform-origin: 0 0; }
+@keyframes hr-spin { to { transform: rotate(360deg); } }
+.hr .spoke { stroke: var(--hr-line); stroke-width: 1.2; transition: opacity .15s; }
+.hr .pe { fill: none; stroke-width: 1.3; opacity: .45; transition: opacity .15s; stroke: var(--c); }
+.hr .h, .hr .p { cursor: pointer; outline: none; transition: opacity .15s; }
+.hr .badge { fill: var(--hr-surface); stroke: var(--hr-ink); stroke-width: 1.4; }
+.hr .h.start .badge { fill: url(#hrBadge); stroke: #b9cdff; }
+.hr .mark { font-family: var(--font-mono); fill: var(--hr-ink); text-anchor: middle; pointer-events: none; }
+.hr .hring, .hr .halo { fill: none; stroke: var(--hr-ink); stroke-width: 1.4; opacity: 0; pointer-events: none; }
+.hr .h:hover .hring, .hr .h.sel .hring, .hr .h:focus-visible .hring,
+.hr .p:hover .halo, .hr .p.sel .halo, .hr .p:focus-visible .halo { opacity: 1; }
+.hr .body { fill: var(--c); fill-opacity: .16; stroke: var(--c); stroke-width: 1.8; }
+.hr .ini { font-weight: 500; fill: var(--hr-ink); text-anchor: middle; pointer-events: none; }
+.hr .lbl { fill: var(--hr-muted); pointer-events: none; transition: opacity .15s; font-weight: 300; }
+.hr .lbl.hub { fill: var(--hr-ink); font-weight: 400; letter-spacing: .02em; }
+.hr .halo-t { paint-order: stroke; stroke: #050c22; stroke-width: 3px; stroke-linejoin: round; }
+.hr .mering { fill: none; stroke: rgba(127, 227, 255, .45); }
+.hr .meini { fill: #fff; font-weight: 500; text-anchor: middle; }
+.hr svg.focus .pe:not(.on), .hr svg.focus .spoke:not(.on) { opacity: .07; }
+.hr svg.focus .p:not(.on), .hr svg.focus .h:not(.on), .hr svg.focus .lbl:not(.on) { opacity: .2; }
+.hr .pe.on { opacity: 1; stroke-width: 1.9; }
+.hr .spoke.on { stroke: var(--hr-ink); }
+.hr .lbl.on { fill: var(--hr-ink); font-weight: 500; }
+.hr .off { opacity: .06 !important; pointer-events: none; }
+
+.hr-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; box-shadow: 0 0 10px -1px var(--c); }
+.hr-chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--hr-line); border-radius: 999px; padding: 5px 12px 5px 10px; font-size: 12.5px; color: var(--hr-ink); background: rgba(255, 255, 255, .03); transition: background .2s; }
+.hr-chip:hover { background: rgba(255, 255, 255, .07); }
+.hr-chip[aria-pressed="false"] { color: var(--hr-muted); border-style: dashed; }
+.hr-chip[aria-pressed="false"] .hr-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c); }
+.hr-kb { display: inline-grid; place-items: center; width: 18px; height: 18px; border: 1px solid var(--hr-ink); border-radius: 50%; font: 10px/1 var(--font-mono); vertical-align: middle; }
+.hr-path { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 6px 14px; width: 100%; text-align: left; padding: 16px 18px; transition: border-color .2s, background .2s; }
+.hr-path:hover, .hr-path.sel { border-color: rgba(185, 205, 255, .45); background: rgba(255, 255, 255, .06); }
+.hr-rank { grid-row: 1 / 4; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 12px var(--font-mono); color: #fff;
+  background: linear-gradient(135deg, #5a85ff, #1a3aa6); box-shadow: 0 8px 18px -8px rgba(47, 91, 234, .9); }
+.hr-tok { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--hr-line); border-radius: 999px; padding: 2px 10px 2px 8px; font-size: 12.5px; background: rgba(3, 8, 23, .5); color: var(--hr-ink); }
+.hr-tok.me { background: var(--hr-ink); color: #071030; border-color: var(--hr-ink); padding-left: 10px; font-weight: 500; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hr .sweep { animation: none; }
+  .hr svg * { transition: none !important; }
+}

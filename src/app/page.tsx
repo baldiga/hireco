@@ -2,7 +2,9 @@ import Link from "next/link";
 import { EarlyBadge, Wordmark } from "@/components/Brand";
 import Constellation from "@/components/Constellation";
 import { ChatMock, ChromeMock, PopupMock, TerminalMock } from "@/components/Mocks";
+import Radar from "@/components/radar/Radar";
 import WaitlistForm from "@/components/WaitlistForm";
+import { DEMO_MAP } from "@/lib/demoMap";
 
 const PATHS = [
   ["Hiring managers", "People who lead the team you want to join — the ones who actually say yes."],
@@ -35,6 +37,7 @@ export default function Home() {
         <Wordmark />
         <nav className="flex items-center gap-6 text-sm text-mist">
           <a href="#how" className="hidden hover:text-frost sm:inline">How it works</a>
+          <a href="#example" className="hidden hover:text-frost sm:inline">Example</a>
           <a href="#early" className="hidden hover:text-frost sm:inline">Early access</a>
           <Link href="/login" className="hover:text-frost">Sign in</Link>
         </nav>
@@ -121,6 +124,21 @@ export default function Home() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Real example */}
+      <section id="example" className="mx-auto w-full max-w-6xl scroll-mt-10 px-4 py-16 sm:px-6">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <p className="eyebrow">A real example · names changed</p>
+            <h2 className="font-display mt-4 text-4xl font-light text-white sm:text-5xl">What you get back.</h2>
+            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-mist">
+              One early adopter asked for a GTM engineer or RevOps role. Hireco searched 8,053 connections and returned this map:
+              eight places to start, in order, and who to talk to first at each. Hover or tap anything.
+            </p>
+          </div>
+        </div>
+        <div className="mt-10"><Radar spec={DEMO_MAP} /></div>
       </section>
 
       {/* USPs */}

@@ -5,6 +5,7 @@ import { verifyApiKey } from "@/lib/apiKeys";
 import { companyIdFromUrn, runSearches, type CompanySpec } from "@/lib/companySearch";
 import { enrichProspects, MAX_PER_CALL } from "@/lib/enrich";
 import { saveExport, type ExportRow } from "@/lib/exports";
+import { autoSpec, BUCKET_INFO, BUCKET_TYPES, rowsFromSpec, type MapSpec } from "@/lib/mapSpec";
 import { findHiringPaths, loadConnections, loadProfile, profileUrl, searchNetwork } from "@/lib/network";
 import { INSTRUCTIONS, welcome } from "@/lib/onboarding";
 import { getStatus } from "@/lib/status";
@@ -87,7 +88,13 @@ const handler = createMcpHandler(
           b.people.map((p) => ({ bucket, name: p.name, title: p.title, company: p.company, url: p.url, why: p.why, enriched: p.enriched })),
         );
         const title = args.title ?? [args.role_keywords.join(", "), args.target_companies?.join(", ")].filter(Boolean).join(" — ");
-        const links = await saveExport(id, title, rows);
+        const spec = autoSpec(rows, { title, me: me?.full_name ?? "You", targets: args.target_companies });
+        spec.stats = [
+          { value: conns.length.toLocaleString(), label: "connections searched" },
+          { value: String(spec.people.length), label: "people mapped" },
+          { value: String(spec.hubs.filter((h) => h.start).length), label: "places to start" },
+        ];
+        const links = await saveExport(id, title, rows, spec);
 
         // Who is worth spending premium enrichment on, best first.
         const seen = new Set<string>();
@@ -132,12 +139,53 @@ const handler = createMcpHandler(
         const conns = await loadConnections(id);
         const all = searchNetwork(conns, { ...args, limit: 1000 });
         const label = [args.query, args.company, args.title, args.seniority?.join("/")].filter(Boolean).join(" · ") || "Network search";
-        const links = await saveExport(
-          id,
-          label,
-          all.results.map((p) => ({ bucket: "search", name: p.name, title: p.title, company: p.company, url: p.url, why: p.headline ?? "", enriched: p.enriched })),
-        );
+        const rows = all.results.map((p) => ({ bucket: "search", name: p.name, title: p.title, company: p.company, url: p.url, why: p.headline ?? "", enriched: p.enriched }));
+        const me = await loadProfile(id);
+        const links = await saveExport(id, label, rows, autoSpec(rows, { title: label, me: me?.full_name ?? "You" }));
         return json({ total: all.total, results: all.results.slice(0, args.limit ?? 50), ...links });
+      },
+    );
+
+    server.registerTool(
+      "publish_map",
+      {
+        title: "Publish a curated Hireco map",
+        description:
+          "Publishes YOUR curated radar map and returns map_url + csv_url. Use after find_hiring_paths to present the best version: group people into hubs (usually one per company, plus type groups like 'Recruiters'), order the start hubs by where the user should begin, give each hub a steps chain (warm door first, then the decision makers) and a one-line note, and each person a short 'why'. Use names, titles and LinkedIn URLs exactly as Hireco returned them.",
+        inputSchema: z.object({
+          title: z.string().describe("e.g. 'GTM engineer or RevOps'"),
+          subtitle: z.string().optional().describe("One sentence on what the map shows"),
+          people: z.array(z.object({
+            id: z.string().describe("Short unique id, e.g. 'noa'"),
+            name: z.string(),
+            title: z.string().optional(),
+            company: z.string().optional(),
+            bucket: z.enum(BUCKET_TYPES),
+            url: z.string().optional().describe("LinkedIn profile URL"),
+            why: z.string().optional().describe("One or two sentences on why this person matters"),
+          })).min(1).max(120),
+          hubs: z.array(z.object({
+            id: z.string(),
+            label: z.string().describe("Short label shown on the map, e.g. company name"),
+            full: z.string().optional().describe("Longer name for cards, e.g. 'GTM recruiters'"),
+            start: z.boolean().describe("true for the ordered places to start (max 8, numbered 1..n in the order given); false for other groups (lettered A..)"),
+            people: z.array(z.string()).min(1).describe("Person ids in this hub"),
+            steps: z.array(z.array(z.string())).optional().describe("Chain of person-id groups, e.g. [['warm-intro'],['manager','vp']]"),
+            note: z.string().optional().describe("One line: how to approach this hub"),
+          })).min(1).max(16),
+          footnote: z.string().optional(),
+        }),
+      },
+      async (spec, ctx) => {
+        const id = userId(ctx);
+        const me = await loadProfile(id);
+        const hubs = [...spec.hubs.filter((h) => h.start).slice(0, 8), ...spec.hubs.filter((h) => !h.start)];
+        const full: MapSpec = { ...spec, me: me?.full_name ?? "You", hubs };
+        const rows: ExportRow[] = rowsFromSpec(full).map((p) => ({
+          bucket: BUCKET_INFO[p.bucket].name, name: p.name, title: p.title ?? null, company: p.company ?? null,
+          url: p.url ?? "", why: [p.hub, p.why].filter(Boolean).join(" — "), enriched: false,
+        }));
+        return json({ ...(await saveExport(id, spec.title, rows, full)), tell_the_user: "Share map_url as 'Open your Hireco map' and csv_url as 'Download CSV'." });
       },
     );
 

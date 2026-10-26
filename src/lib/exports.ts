@@ -1,4 +1,5 @@
 import "server-only";
+import { autoSpec, type MapSpec } from "./mapSpec";
 import { adminClient } from "./supabase/admin";
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://hireco-seven.vercel.app";
@@ -24,16 +25,23 @@ export const BUCKET_LABELS: Record<string, string> = {
 };
 
 /** Saves a result snapshot; returns links the user can open without signing in. */
-export async function saveExport(userId: string, title: string, rows: ExportRow[]) {
-  const { data, error } = await adminClient().from("exports").insert({ user_id: userId, title, rows }).select("id").single();
+export async function saveExport(userId: string, title: string, rows: ExportRow[], spec?: MapSpec) {
+  const { data, error } = await adminClient().from("exports").insert({ user_id: userId, title, rows, spec: spec ?? null }).select("id").single();
   if (error) throw error;
   return { csv_url: `${SITE_URL}/api/export/${data.id}`, map_url: `${SITE_URL}/map/${data.id}` };
 }
 
 export async function loadExport(id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
-  const { data } = await adminClient().from("exports").select("title, rows, created_at").eq("id", id).maybeSingle();
-  return data as { title: string; rows: ExportRow[]; created_at: string } | null;
+  const { data } = await adminClient().from("exports").select("title, rows, spec, created_at").eq("id", id).maybeSingle();
+  if (!data) return null;
+  const rows = data.rows as ExportRow[];
+  return {
+    title: data.title as string,
+    created_at: data.created_at as string,
+    rows,
+    spec: (data.spec as MapSpec | null) ?? autoSpec(rows, { title: data.title, me: "You" }),
+  };
 }
 
 const cell = (v: unknown) => {
