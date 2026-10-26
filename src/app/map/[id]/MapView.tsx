@@ -29,17 +29,17 @@ export default function MapView({ rows }: { rows: Row[] }) {
   const nodes = groups.flatMap(([bucket, people], gi) => {
     const span = (Math.PI * 2) / groups.length;
     const start = -Math.PI / 2 + gi * span;
-    return people.slice(0, PER_BUCKET).map((p, i) => {
+    const shown = people.slice(0, PER_BUCKET);
+    return shown.map((p, i) => {
       const ring = i % 3;
-      const t = (Math.floor(i / 3) + 0.5) / Math.ceil(Math.min(people.length, PER_BUCKET) / 3);
-      const a = start + span * (0.12 + 0.76 * t);
+      const a = start + span * (0.14 + 0.72 * ((i + 0.5) / shown.length));
       const r = 150 + ring * 70;
       return { ...p, x: CX + Math.cos(a) * r * 1.25, y: CY + Math.sin(a) * r * 0.85, key: `${bucket}-${i}` };
     });
   });
   const labels = groups.map(([bucket, people], gi) => {
     const a = -Math.PI / 2 + (gi + 0.5) * ((Math.PI * 2) / groups.length);
-    return { bucket, count: people.length, x: CX + Math.cos(a) * 395, y: CY + Math.sin(a) * 285 };
+    return { bucket, count: people.length, x: CX + Math.cos(a) * 330, y: CY + Math.sin(a) * 290 + 4 };
   });
   const visible = rows.filter((r) => !filter || r.bucket === filter);
 
