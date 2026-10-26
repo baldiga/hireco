@@ -185,6 +185,12 @@ export default function Home() {
       <footer className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-10 text-xs text-mist">
         <Wordmark />
         <p>Hireco reads only what you can already see on LinkedIn, from your own browser.</p>
+        <nav className="flex gap-5">
+          <Link href="/guide" className="hover:text-frost">Guide</Link>
+          <Link href="/support" className="hover:text-frost">Support</Link>
+          <Link href="/privacy" className="hover:text-frost">Privacy</Link>
+          <Link href="/terms" className="hover:text-frost">Terms</Link>
+        </nav>
       </footer>
     </main>
   );
