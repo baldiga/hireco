@@ -32,7 +32,6 @@ export default function Radar({ spec, maxSize = 860 }: { spec: MapSpec; maxSize?
   const [sel, setSel] = useState<Target>(null);
   const [hov, setHov] = useState<Target>(null);
   const [off, setOff] = useState<Record<string, boolean>>({});
-  const [openPath, setOpenPath] = useState<{ hub: string; person: string } | null>(null);
 
   const P = useMemo(() => Object.fromEntries(spec.people.map((p) => [p.id, p])), [spec]);
   const hubs = useMemo(() => spec.hubs.map((h) => ({ ...h, people: h.people.filter((id) => P[id]) })).filter((h) => h.people.length), [spec, P]);
@@ -210,61 +209,10 @@ export default function Radar({ spec, maxSize = 860 }: { spec: MapSpec; maxSize?
   };
   const same = (x: Target, y: Target) => !!x && !!y && x.t === y.t && x.id === y.id;
   const select = (t: Target, keep = false) => setSel((cur) => (!keep && same(t, cur) ? null : t));
-  const selHub = sel ? (sel.t === "h" ? sel.id : hubOf[sel.id]) : null;
   const startHubs = hubs.filter((h) => h.start);
 
   return (
     <div className="hr">
-      {startHubs.length > 0 && (
-        <section aria-labelledby="hr-paths">
-          <h2 id="hr-paths" className="font-display text-3xl font-light text-white">Best paths</h2>
-          <p className="mb-4 mt-1 text-mist">Ranked — start at the top. Select a person to see why they matter and open their LinkedIn.</p>
-          <ol className="grid gap-2.5">
-            {startHubs.map((h) => {
-              const openHere = openPath?.hub === h.id ? P[openPath.person] : null;
-              return (
-                <li key={h.id}>
-                  <div role="group" aria-label={`Path ${HB[h.id].mark}: ${h.full ?? h.label}`}
-                    className={`hr-path panel cursor-pointer ${selHub === h.id ? "sel" : ""}`}
-                    onClick={() => select({ t: "h", id: h.id })}
-                    onPointerOver={(e) => e.pointerType !== "touch" && setHov({ t: "h", id: h.id })}
-                    onPointerLeave={(e) => e.pointerType !== "touch" && setHov(null)}>
-                    <span className="hr-rank">{HB[h.id].mark}</span>
-                    <span className="font-display text-xl text-white">{h.full ?? h.label}</span>
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <span className="hr-tok me">You</span>
-                      {(h.steps?.length ? h.steps : [h.people]).map((group, gi) => (
-                        <span key={gi} className="contents">
-                          <span className="code text-mist" aria-hidden>→</span>
-                          {group.filter((id) => P[id]).map((id) => (
-                            <button key={id} type="button" style={cvar(P[id].bucket)} aria-expanded={openHere?.id === id}
-                              className={`hr-tok hr-tok-btn ${openHere?.id === id ? "open" : ""}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const closing = openHere?.id === id;
-                                setOpenPath(closing ? null : { hub: h.id, person: id });
-                                select(closing ? { t: "h", id: h.id } : { t: "p", id }, true);
-                              }}>
-                              <i className="hr-dot !h-2 !w-2" />{P[id].name}
-                            </button>
-                          ))}
-                        </span>
-                      ))}
-                    </span>
-                    {h.note && <span className="text-sm text-mist">{h.note}</span>}
-                    {openHere && (
-                      <div onClick={(e) => e.stopPropagation()} className="contents">
-                        <PathPerson p={openHere} demo={spec.demo} onClose={() => setOpenPath(null)} />
-                      </div>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        </section>
-      )}
-
       <div className="hr-stage">
         <section className="hr-scope panel panel-hi" aria-label="Network map">
           <div className="hr-wrap" ref={wrapRef}>
@@ -307,57 +255,93 @@ export default function Radar({ spec, maxSize = 860 }: { spec: MapSpec; maxSize?
         </div>
       </div>
 
-      <ListView hubs={hubs} marks={marks} P={P} off={off} onPick={(id) => { select({ t: "p", id }, true); svgRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }} />
+      <ListView hubs={hubs} marks={marks} P={P} off={off} demo={spec.demo}
+        selected={sel?.t === "p" ? sel.id : null}
+        onPick={(id) => { select({ t: "p", id }, true); svgRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }}
+        onHub={(id) => setHov(id ? { t: "h", id } : null)} />
     </div>
   );
 }
 
-function PathPerson({ p, demo, onClose }: { p: MapPerson; demo?: boolean; onClose: () => void }) {
+function Crown({ className = "" }: { className?: string }) {
   return (
-    <div className="hr-path-person col-start-2 mt-2 rounded-2xl border border-[var(--hr-line)] bg-black/30 p-4" style={cvar(p.bucket)}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="eyebrow flex items-center gap-2"><i className="hr-dot" />{BUCKET_INFO[p.bucket].name}</p>
-          <p className="font-display mt-1 text-2xl text-white">{p.name}</p>
-          <p className="text-sm text-mist">{roleLine(p)}</p>
-        </div>
-        <button type="button" onClick={onClose} aria-label="Close" className="text-mist hover:text-white">✕</button>
-      </div>
-      {p.why && <p className="mt-2 text-sm leading-relaxed text-frost/90">{p.why}</p>}
-      {p.url ? <a href={p.url} target="_blank" rel="noopener noreferrer" className="btn-primary mt-3 px-4 py-2 text-sm">Open on LinkedIn</a> : demo && <span className="btn-primary mt-3 cursor-not-allowed px-4 py-2 text-sm opacity-50" title="Links are hidden in this example">Open on LinkedIn</span>}
-    </div>
+    <svg viewBox="0 0 24 24" className={`hr-crown ${className}`} aria-hidden>
+      <path d="M3 8.5l4.5 3.6L12 5l4.5 7.1L21 8.5l-1.8 9.5H4.8L3 8.5z" />
+      <path d="M5 20.5h14" />
+    </svg>
   );
 }
 
-function ListView({ hubs, marks, P, off, onPick }: {
-  hubs: MapSpec["hubs"]; marks: string[]; P: Record<string, MapPerson>; off: Record<string, boolean>; onPick: (id: string) => void;
+/** Everyone on the map: best paths first (gold, in rank order), then the other groups. */
+function ListView({ hubs, marks, P, off, demo, selected, onPick, onHub }: {
+  hubs: MapSpec["hubs"]; marks: string[]; P: Record<string, MapPerson>; off: Record<string, boolean>; demo?: boolean;
+  selected: string | null; onPick: (id: string) => void; onHub: (id: string | null) => void;
 }) {
-  const rows = hubs.flatMap((h, i) => h.people.map((id) => ({ hub: h, mark: marks[i], p: P[id] }))).filter((r) => r.p && !off[r.p.bucket]);
+  // Within a hub, follow the suggested chain (warm door first), then anyone else.
+  const ordered = (h: MapSpec["hubs"][number]) => [...new Set([...(h.steps ?? []).flat(), ...h.people])].filter((id) => P[id] && !off[P[id].bucket]);
+  const groups = hubs.map((h, i) => ({ h, mark: marks[i], ids: ordered(h) })).filter((g) => g.ids.length);
+  const best = groups.filter((g) => g.h.start), rest = groups.filter((g) => !g.h.start);
+  const total = groups.reduce((n, g) => n + g.ids.length, 0);
+
+  const Rows = ({ g, gold }: { g: (typeof groups)[number]; gold: boolean }) => (
+    <tbody className={gold ? "hr-best" : ""} onPointerEnter={() => onHub(g.h.id)} onPointerLeave={() => onHub(null)}>
+      <tr className="hr-group">
+        <td colSpan={6} className="px-4 pb-2 pt-5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {gold ? <><Crown className="h-5 w-5" /><span className="hr-rank hr-rank-gold">{g.mark}</span></> : <span className="hr-kb">{g.mark}</span>}
+            <span className={`font-display text-xl ${gold ? "hr-gold-text" : "text-white"}`}>{g.h.full ?? g.h.label}</span>
+            <span className="code text-[11px] text-mist">{g.ids.length}</span>
+          </div>
+          {g.h.note && <p className={`mt-1 text-sm ${gold ? "text-frost/85" : "text-mist"} ${gold ? "pl-[4.25rem]" : "pl-7"}`}>{g.h.note}</p>}
+        </td>
+      </tr>
+      {g.ids.map((id, i) => {
+        const p = P[id];
+        return (
+          <tr key={id} className={`hr-row ${selected === id ? "sel" : ""}`}>
+            <td className="w-12 py-3 pl-4 pr-0 text-center">
+              {gold ? <Crown className={`mx-auto h-4 w-4 ${i === 0 ? "" : "opacity-45"}`} /> : <span className="hr-dot mx-auto block" style={cvar(p.bucket)} />}
+            </td>
+            <td className="min-w-[180px] px-4 py-3">
+              <button type="button" onClick={() => onPick(id)} className="text-left font-normal text-white hover:underline">{p.name}</button>
+              {gold && i === 0 && <span className="hr-first">start here</span>}
+            </td>
+            <td className="px-4 py-3 text-frost">{roleLine(p)}</td>
+            <td className="whitespace-nowrap px-4 py-3" style={cvar(p.bucket)}><i className="hr-dot mr-2" /><span className="text-frost">{BUCKET_INFO[p.bucket].name}</span></td>
+            <td className="max-w-[360px] px-4 py-3 text-mist">{p.why}</td>
+            <td className="whitespace-nowrap px-4 py-3 text-right">
+              {p.url
+                ? <a href={p.url} target="_blank" rel="noopener noreferrer" className={gold ? "hr-li hr-li-gold" : "hr-li"}>LinkedIn ↗</a>
+                : demo && <span className="hr-li cursor-not-allowed opacity-40" title="Links are hidden in this example">LinkedIn ↗</span>}
+            </td>
+          </tr>
+        );
+      })}
+    </tbody>
+  );
+
   return (
     <section aria-labelledby="hr-list">
-      <h2 id="hr-list" className="font-display text-3xl font-light text-white">Everyone on the map</h2>
-      <p className="mb-4 mt-1 text-mist">{rows.length} people, in hub order. The type filters above apply here too.</p>
-      <div className="panel overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 id="hr-list" className="font-display text-3xl font-light text-white">Who to talk to</h2>
+          <p className="mt-1 text-mist">
+            {total} people. <span className="hr-gold-text">Best paths first</span>, in order — start with the crowned name in each.
+          </p>
+        </div>
+      </div>
+      <div className="panel mt-4 overflow-x-auto">
+        <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="text-[11px] uppercase tracking-[0.18em] text-mist">
-            <tr>{["Hub", "Name", "Role", "Type", "Why", ""].map((h, i) => <th key={i} className="px-4 py-3.5 font-normal">{h}</th>)}</tr>
+            <tr><th className="w-12" />{["Name", "Role", "Type", "Why", ""].map((h, i) => <th key={i} className="px-4 py-3.5 font-normal">{h}</th>)}</tr>
           </thead>
-          <tbody>
-            {rows.map(({ hub, mark, p }) => (
-              <tr key={`${hub.id}-${p.id}`} className="border-t border-[var(--hr-line)] align-top hover:bg-white/[0.03]">
-                <td className="whitespace-nowrap px-4 py-3 text-mist"><span className="hr-kb mr-2">{mark}</span>{hub.label}</td>
-                <td className="px-4 py-3">
-                  <button type="button" onClick={() => onPick(p.id)} className="text-left text-white hover:underline">{p.name}</button>
-                </td>
-                <td className="px-4 py-3 text-frost">{roleLine(p)}</td>
-                <td className="whitespace-nowrap px-4 py-3" style={cvar(p.bucket)}><i className="hr-dot mr-2" /><span className="text-frost">{BUCKET_INFO[p.bucket].name}</span></td>
-                <td className="max-w-[340px] px-4 py-3 text-mist">{p.why}</td>
-                <td className="whitespace-nowrap px-4 py-3">
-                  {p.url && <a href={p.url} target="_blank" rel="noopener noreferrer" className="text-ice underline decoration-white/20 underline-offset-4">LinkedIn ↗</a>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
+          {best.map((g) => <Rows key={g.h.id} g={g} gold />)}
+          {rest.length > 0 && (
+            <tbody>
+              <tr><td colSpan={6} className="px-4 pb-1 pt-7"><span className="eyebrow">Also worth a look</span></td></tr>
+            </tbody>
+          )}
+          {rest.map((g) => <Rows key={g.h.id} g={g} gold={false} />)}
         </table>
       </div>
     </section>
