@@ -21,7 +21,7 @@ export async function joinWaitlist(_prev: FormState, form: FormData): Promise<Fo
     .from("waitlist")
     .upsert({ email, full_name: fullName, linkedin_url: linkedin }, { onConflict: "email", ignoreDuplicates: true });
   if (error) return { ok: false, message: "Something went wrong. Please try again." };
-  return { ok: true, message: "You're on the list. We'll email you as soon as your access is approved." };
+  return { ok: true, message: "We'll email you as soon as your access is approved." };
 }
 
 export async function requestSignIn(_prev: FormState, form: FormData): Promise<FormState> {
