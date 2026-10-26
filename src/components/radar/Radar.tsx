@@ -32,6 +32,7 @@ export default function Radar({ spec, maxSize = 860 }: { spec: MapSpec; maxSize?
   const [sel, setSel] = useState<Target>(null);
   const [hov, setHov] = useState<Target>(null);
   const [off, setOff] = useState<Record<string, boolean>>({});
+  const [openPath, setOpenPath] = useState<{ hub: string; person: string } | null>(null);
 
   const P = useMemo(() => Object.fromEntries(spec.people.map((p) => [p.id, p])), [spec]);
   const hubs = useMemo(() => spec.hubs.map((h) => ({ ...h, people: h.people.filter((id) => P[id]) })).filter((h) => h.people.length), [spec, P]);
@@ -214,6 +215,56 @@ export default function Radar({ spec, maxSize = 860 }: { spec: MapSpec; maxSize?
 
   return (
     <div className="hr">
+      {startHubs.length > 0 && (
+        <section aria-labelledby="hr-paths">
+          <h2 id="hr-paths" className="font-display text-3xl font-light text-white">Best paths</h2>
+          <p className="mb-4 mt-1 text-mist">Ranked — start at the top. Select a person to see why they matter and open their LinkedIn.</p>
+          <ol className="grid gap-2.5">
+            {startHubs.map((h) => {
+              const openHere = openPath?.hub === h.id ? P[openPath.person] : null;
+              return (
+                <li key={h.id}>
+                  <div role="group" aria-label={`Path ${HB[h.id].mark}: ${h.full ?? h.label}`}
+                    className={`hr-path panel cursor-pointer ${selHub === h.id ? "sel" : ""}`}
+                    onClick={() => select({ t: "h", id: h.id })}
+                    onPointerOver={(e) => e.pointerType !== "touch" && setHov({ t: "h", id: h.id })}
+                    onPointerLeave={(e) => e.pointerType !== "touch" && setHov(null)}>
+                    <span className="hr-rank">{HB[h.id].mark}</span>
+                    <span className="font-display text-xl text-white">{h.full ?? h.label}</span>
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="hr-tok me">You</span>
+                      {(h.steps?.length ? h.steps : [h.people]).map((group, gi) => (
+                        <span key={gi} className="contents">
+                          <span className="code text-mist" aria-hidden>→</span>
+                          {group.filter((id) => P[id]).map((id) => (
+                            <button key={id} type="button" style={cvar(P[id].bucket)} aria-expanded={openHere?.id === id}
+                              className={`hr-tok hr-tok-btn ${openHere?.id === id ? "open" : ""}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const closing = openHere?.id === id;
+                                setOpenPath(closing ? null : { hub: h.id, person: id });
+                                select(closing ? { t: "h", id: h.id } : { t: "p", id }, true);
+                              }}>
+                              <i className="hr-dot !h-2 !w-2" />{P[id].name}
+                            </button>
+                          ))}
+                        </span>
+                      ))}
+                    </span>
+                    {h.note && <span className="text-sm text-mist">{h.note}</span>}
+                    {openHere && (
+                      <div onClick={(e) => e.stopPropagation()} className="contents">
+                        <PathPerson p={openHere} demo={spec.demo} onClose={() => setOpenPath(null)} />
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      )}
+
       <div className="hr-stage">
         <section className="hr-scope panel panel-hi" aria-label="Network map">
           <div className="hr-wrap" ref={wrapRef}>
@@ -256,38 +307,60 @@ export default function Radar({ spec, maxSize = 860 }: { spec: MapSpec; maxSize?
         </div>
       </div>
 
-      {startHubs.length > 0 && (
-        <section aria-labelledby="hr-paths">
-          <h2 id="hr-paths" className="font-display text-3xl font-light text-white">Best paths</h2>
-          <p className="mb-4 mt-1 text-mist">Ranked. Select one to light it up on the map.</p>
-          <ol className="grid gap-2.5">
-            {startHubs.map((h) => (
-              <li key={h.id}>
-                <button type="button" className={`hr-path panel ${selHub === h.id ? "sel" : ""}`}
-                  onClick={() => select({ t: "h", id: h.id })}
-                  onPointerOver={(e) => e.pointerType !== "touch" && setHov({ t: "h", id: h.id })}
-                  onPointerLeave={(e) => e.pointerType !== "touch" && setHov(null)}>
-                  <span className="hr-rank">{HB[h.id].mark}</span>
-                  <span className="font-display text-xl text-white">{h.full ?? h.label}</span>
-                  <span className="flex flex-wrap items-center gap-1.5">
-                    <span className="hr-tok me">You</span>
-                    {(h.steps?.length ? h.steps : [h.people]).map((group, gi) => (
-                      <span key={gi} className="contents">
-                        <span className="code text-mist" aria-hidden>→</span>
-                        {group.filter((id) => P[id]).map((id) => (
-                          <span key={id} className="hr-tok" style={cvar(P[id].bucket)}><i className="hr-dot !h-2 !w-2" />{P[id].name}</span>
-                        ))}
-                      </span>
-                    ))}
-                  </span>
-                  {h.note && <span className="text-sm text-mist">{h.note}</span>}
-                </button>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
+      <ListView hubs={hubs} marks={marks} P={P} off={off} onPick={(id) => { select({ t: "p", id }, true); svgRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }} />
     </div>
+  );
+}
+
+function PathPerson({ p, demo, onClose }: { p: MapPerson; demo?: boolean; onClose: () => void }) {
+  return (
+    <div className="hr-path-person col-start-2 mt-2 rounded-2xl border border-[var(--hr-line)] bg-black/30 p-4" style={cvar(p.bucket)}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="eyebrow flex items-center gap-2"><i className="hr-dot" />{BUCKET_INFO[p.bucket].name}</p>
+          <p className="font-display mt-1 text-2xl text-white">{p.name}</p>
+          <p className="text-sm text-mist">{roleLine(p)}</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Close" className="text-mist hover:text-white">✕</button>
+      </div>
+      {p.why && <p className="mt-2 text-sm leading-relaxed text-frost/90">{p.why}</p>}
+      {p.url ? <a href={p.url} target="_blank" rel="noopener noreferrer" className="btn-primary mt-3 px-4 py-2 text-sm">Open on LinkedIn</a> : demo && <span className="btn-primary mt-3 cursor-not-allowed px-4 py-2 text-sm opacity-50" title="Links are hidden in this example">Open on LinkedIn</span>}
+    </div>
+  );
+}
+
+function ListView({ hubs, marks, P, off, onPick }: {
+  hubs: MapSpec["hubs"]; marks: string[]; P: Record<string, MapPerson>; off: Record<string, boolean>; onPick: (id: string) => void;
+}) {
+  const rows = hubs.flatMap((h, i) => h.people.map((id) => ({ hub: h, mark: marks[i], p: P[id] }))).filter((r) => r.p && !off[r.p.bucket]);
+  return (
+    <section aria-labelledby="hr-list">
+      <h2 id="hr-list" className="font-display text-3xl font-light text-white">Everyone on the map</h2>
+      <p className="mb-4 mt-1 text-mist">{rows.length} people, in hub order. The type filters above apply here too.</p>
+      <div className="panel overflow-x-auto">
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <thead className="text-[11px] uppercase tracking-[0.18em] text-mist">
+            <tr>{["Hub", "Name", "Role", "Type", "Why", ""].map((h, i) => <th key={i} className="px-4 py-3.5 font-normal">{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {rows.map(({ hub, mark, p }) => (
+              <tr key={`${hub.id}-${p.id}`} className="border-t border-[var(--hr-line)] align-top hover:bg-white/[0.03]">
+                <td className="whitespace-nowrap px-4 py-3 text-mist"><span className="hr-kb mr-2">{mark}</span>{hub.label}</td>
+                <td className="px-4 py-3">
+                  <button type="button" onClick={() => onPick(p.id)} className="text-left text-white hover:underline">{p.name}</button>
+                </td>
+                <td className="px-4 py-3 text-frost">{roleLine(p)}</td>
+                <td className="whitespace-nowrap px-4 py-3" style={cvar(p.bucket)}><i className="hr-dot mr-2" /><span className="text-frost">{BUCKET_INFO[p.bucket].name}</span></td>
+                <td className="max-w-[340px] px-4 py-3 text-mist">{p.why}</td>
+                <td className="whitespace-nowrap px-4 py-3">
+                  {p.url && <a href={p.url} target="_blank" rel="noopener noreferrer" className="text-ice underline decoration-white/20 underline-offset-4">LinkedIn ↗</a>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -326,7 +399,7 @@ function Card({ target, spec, P, HB, hubOf, startCount, onPick }: {
         <p className="mt-1 text-sm text-mist">{roleLine(p)}</p>
         {p.why && <p className="mt-3 text-sm leading-relaxed text-frost/90">{p.why}</p>}
         <div className="mt-5 flex flex-wrap gap-2">
-          {p.url && <a href={p.url} target="_blank" rel="noopener noreferrer" className="btn-primary px-4 py-2 text-sm">Open on LinkedIn</a>}
+          {p.url ? <a href={p.url} target="_blank" rel="noopener noreferrer" className="btn-primary px-4 py-2 text-sm">Open on LinkedIn</a> : spec.demo && <span className="btn-primary cursor-not-allowed px-4 py-2 text-sm opacity-50" title="Links are hidden in this example">Open on LinkedIn</span>}
           <button type="button" className="btn-ghost px-4 py-2 text-sm" onClick={() => onPick({ t: "h", id: hub.id })}>View hub {hub.mark}</button>
         </div>
       </>

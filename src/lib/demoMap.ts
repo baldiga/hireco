@@ -45,6 +45,7 @@ P("roman", "Roman Bar", "Head of HubSpot & RevOps", "Sagewell", "other", "Heads 
 export const DEMO_MAP: MapSpec = {
   title: "Hiring path map",
   subtitle: "Routes through your LinkedIn network to a GTM engineer or RevOps role.",
+  demo: true,
   me: "Dana Rivlin",
   people: people.map((p) => ({ ...p, url: undefined })),
   stats: [

@@ -72,3 +72,8 @@
   .hr .sweep { animation: none; }
   .hr svg * { transition: none !important; }
 }
+.hr-tok-btn { cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s; }
+.hr-tok-btn:hover { border-color: var(--c); background: rgba(255, 255, 255, .06); }
+.hr-tok-btn.open { border-color: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 25%, transparent); }
+.hr-path-person { animation: hr-in .25s ease-out; }
+@keyframes hr-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

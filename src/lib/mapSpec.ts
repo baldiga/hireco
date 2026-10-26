@@ -16,7 +16,7 @@ export const BUCKET_INFO: Record<BucketType, { name: string; hint: string }> = {
 
 export type MapPerson = { id: string; name: string; title?: string | null; company?: string | null; bucket: BucketType; url?: string; why?: string };
 export type MapHub = { id: string; label: string; full?: string; start: boolean; people: string[]; steps?: string[][]; note?: string };
-export type MapSpec = { title: string; subtitle?: string; me: string; people: MapPerson[]; hubs: MapHub[]; footnote?: string; stats?: { label: string; value: string }[] };
+export type MapSpec = { title: string; subtitle?: string; demo?: boolean; me: string; people: MapPerson[]; hubs: MapHub[]; footnote?: string; stats?: { label: string; value: string }[] };
 
 /** Marks: start hubs get 1..n, the rest A..Z. */
 export function hubMarks(hubs: MapHub[]) {
