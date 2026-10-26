@@ -43,7 +43,12 @@ export function seniorityOf(title: string | null | undefined): Seniority {
 
 const SUFFIXES = /\b(ltd|limited|inc|incorporated|llc|gmbh|plc|corp|corporation|co|company|group|technologies|technology|labs|bv|sa|ag)\b\.?/gi;
 export function normCompany(name: string | null | undefined) {
-  return (name ?? "").toLowerCase().replace(SUFFIXES, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  return (name ?? "")
+    .toLowerCase()
+    .replace(/\.(com|io|ai|co|net|org)\b/g, "")
+    .replace(SUFFIXES, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
 }
 function sameCompany(a: string | null | undefined, b: string | null | undefined) {
   const x = normCompany(a), y = normCompany(b);

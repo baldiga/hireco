@@ -43,3 +43,6 @@ next-env.d.ts
 # local secrets
 *.local
 supabase/.temp
+
+.vercel
+.env*
