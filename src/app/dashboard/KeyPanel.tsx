@@ -33,7 +33,11 @@ export default function KeyPanel({ origin, hasKey, children }: { origin: string;
 
       <Step n="05" title="Connect your AI" id="connect">
         <div className="grid gap-5">
-          <CopyBlock label="Claude Code" text={`claude mcp add --transport http hireco ${mcpUrl} --header "Authorization: Bearer ${shown}"`} />
+          <CopyBlock
+            label="Claude Code plugin · recommended (adds the job-hunt skill too; asks for your key)"
+            text={`/plugin marketplace add https://github.com/baldiga/hireco-plugin.git\n/plugin install hireco@hireco`}
+          />
+          <CopyBlock label="Claude Code · MCP only" text={`claude mcp add --transport http hireco ${mcpUrl} --header "Authorization: Bearer ${shown}"`} />
           <CopyBlock
             label="Codex · Cursor · other MCP clients"
             text={JSON.stringify({ mcpServers: { hireco: { url: mcpUrl, headers: { Authorization: `Bearer ${shown}` } } } }, null, 2)}
