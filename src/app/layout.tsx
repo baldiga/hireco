@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
+import Analytics from "@/components/Analytics";
 import "./globals.css";
 
 const display = Cormorant_Garamond({ variable: "--nf-display", subsets: ["latin"], weight: ["300", "400", "500"], style: ["normal", "italic"] });
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <div className="grain" aria-hidden />
         {children}
       </body>
+      <Analytics />
     </html>
   );
 }

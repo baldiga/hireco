@@ -20,6 +20,7 @@ export default function Privacy() {
           <li><b className="font-normal text-white">Premium enrichment</b> — if you choose to enrich specific prospects, we fetch their public professional profile (titles, work history, education, location) through a third-party data provider.</li>
           <li><b className="font-normal text-white">Results you create</b> — maps and CSV exports generated from your searches.</li>
           <li><b className="font-normal text-white">API keys</b> — we store only a one-way hash of each key, never the key itself.</li>
+          <li><b className="font-normal text-white">Website usage</b> — Google Analytics sets cookies on hireco.help to count visits and see which pages people use (pages viewed, referrer, device and approximate location). It is not used on map pages, and the extension does not use it.</li>
         </ul>
       </Section>
 
@@ -42,6 +43,7 @@ export default function Privacy() {
           <li><b className="font-normal text-white">Vercel</b> — web hosting and the API.</li>
           <li><b className="font-normal text-white">Resend</b> — sending sign-in emails.</li>
           <li><b className="font-normal text-white">Apify</b> — fetching public profiles, only when you use premium enrichment.</li>
+          <li><b className="font-normal text-white">Google Analytics</b> — website visit statistics. You can block it with any ad or tracker blocker without affecting Hireco.</li>
         </ul>
         <p>Your AI agent (for example Claude) receives the results you ask it for, under that provider&apos;s own terms.</p>
       </Section>
