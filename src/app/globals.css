@@ -104,6 +104,12 @@ body {
 .float { animation: drift 7s ease-in-out infinite; }
 .flow { stroke-dasharray: 3 7; animation: dash 3s linear infinite; }
 
+/* Setup walkthrough: pulsing gold ring on the thing to click, and a soft step transition. */
+.wt-ring { box-shadow: 0 0 0 2px #f0c25e, 0 0 0 6px rgba(240, 194, 94, .28); animation: wt-pulse 1.8s ease-in-out infinite; }
+@keyframes wt-pulse { 50% { box-shadow: 0 0 0 2px #f0c25e, 0 0 0 11px rgba(240, 194, 94, 0); } }
+.wt-in { animation: wt-in .45s cubic-bezier(.2, .7, .2, 1); }
+@keyframes wt-in { from { opacity: 0; transform: translateY(8px); } }
+
 @media (prefers-reduced-motion: reduce) {
-  .rise, .float, .flow { animation: none !important; opacity: 1 !important; }
+  .rise, .float, .flow, .wt-ring, .wt-in { animation: none !important; opacity: 1 !important; }
 }

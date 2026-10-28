@@ -30,7 +30,10 @@ export default function InstallExtension({ download = true }: { download?: boole
           </li>
         ))}
       </ol>
-      {download && <a href="/downloads/hireco-extension.zip" download className="btn-primary mt-6">↓ Download hireco-extension.zip</a>}
+      <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+        {download && <a href="/downloads/hireco-extension.zip" download className="btn-primary">↓ Download hireco-extension.zip</a>}
+        <a href="/setup" className="text-sm text-ice underline decoration-white/20 underline-offset-4 hover:text-white">See every click with screenshots →</a>
+      </div>
       <details className="group mt-6 rounded-2xl border border-[var(--line)] bg-white/[0.02] px-5 py-4 text-sm">
         <summary className="cursor-pointer list-none text-ice marker:hidden">
           <span className="inline-block transition group-open:rotate-90">›</span>&nbsp; Stuck? Common fixes

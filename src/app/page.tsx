@@ -123,7 +123,10 @@ export default function Home() {
             <p className="eyebrow">How it works</p>
             <h2 className="font-display mt-4 text-4xl font-light text-white sm:text-5xl">Ten minutes to your first map.</h2>
           </div>
-          <a href="/downloads/hireco-extension.zip" download className="btn-primary">↓ Download the extension</a>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/setup" className="btn-ghost">Step-by-step walkthrough</Link>
+            <a href="/downloads/hireco-extension.zip" download className="btn-primary">↓ Download the extension</a>
+          </div>
         </div>
         <div className="mt-16 space-y-20">
           {STEPS.map((s, i) => (

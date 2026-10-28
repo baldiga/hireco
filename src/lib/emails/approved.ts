@@ -3,6 +3,7 @@
 const SERIF = "'Cormorant Garamond',Georgia,'Times New Roman',serif";
 const SANS = "'Hanken Grotesk','Helvetica Neue',Arial,sans-serif";
 const LOGIN = "https://hireco.help/login";
+const SETUP = "https://hireco.help/setup";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -75,6 +76,7 @@ export function approvedEmail(fullName: string | null) {
               <p style="margin:0 0 14px;font-family:${SANS};font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#e7d6b0;">Ten minutes to your first map</p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${steps}</table>
               <p style="margin:22px 0 0;font-family:${SANS};font-size:13px;line-height:1.6;color:#8a99c6;">
+                Prefer to see every click? Follow the <a href="${SETUP}" target="_blank" style="color:#8fb0ff;text-decoration:underline;">step-by-step walkthrough with screenshots</a>.<br>
                 Questions or stuck on a step? Just reply to this email.
               </p>
             </td>
@@ -102,6 +104,8 @@ Ten minutes to your first map:
 1. Sign in with this email address. We'll send you a one-time link.
 2. Install the Chrome extension and sync your LinkedIn connections. The dashboard walks you through it.
 3. Connect Hireco to your AI (Claude, Cursor, Codex and more), then ask: "Who can get me hired as ... at ...?"
+
+Step-by-step walkthrough with screenshots: ${SETUP}
 
 Questions or stuck on a step? Just reply to this email.
 

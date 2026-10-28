@@ -69,6 +69,16 @@ export default async function Dashboard() {
         </div>
       </section>
 
+      {!synced && (
+        <Link href="/setup" className="rise d2 panel mt-8 flex items-center justify-between gap-4 p-5 transition hover:bg-white/[0.04]">
+          <span>
+            <span className="block text-white">First time? Follow the walkthrough.</span>
+            <span className="block text-sm text-mist">Every click, with screenshots: extension, key, sync and your AI.</span>
+          </span>
+          <span className="text-ice">→</span>
+        </Link>
+      )}
+
       <div className="rise d2 mt-12 grid gap-5">
         <Step n="01" title="Install the Chrome extension">
           <p className="mb-5 text-mist">
