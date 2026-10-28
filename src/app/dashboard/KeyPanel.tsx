@@ -1,19 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import ConnectAgent from "@/components/ConnectAgent";
 import CopyBlock from "@/components/CopyBlock";
 import { generateKey } from "./actions";
 
-// Step 3 (key) and step 5 (connect your AI) share the generated key.
+// Step 2 (key) and step 4 (connect your AI) share the generated key.
 export default function KeyPanel({ origin, hasKey, children }: { origin: string; hasKey: boolean; children: React.ReactNode }) {
   const [key, setKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const shown = key ?? "hk_YOUR_KEY";
   const mcpUrl = `${origin}/api/mcp`;
 
   return (
     <>
-      <Step n="03" title="Get your API key" done={hasKey || !!key}>
+      <Step n="02" title="Get your API key" done={hasKey || !!key}>
         <p className="text-mist">The extension and your AI both use it. It&apos;s shown once — keep it somewhere safe.</p>
         {key ? (
           <div className="mt-4"><CopyBlock text={key} /></div>
@@ -31,18 +31,11 @@ export default function KeyPanel({ origin, hasKey, children }: { origin: string;
 
       {children}
 
-      <Step n="05" title="Connect your AI" id="connect">
-        <div className="grid gap-5">
-          <CopyBlock
-            label="Claude Code plugin · recommended (adds the job-hunt skill too; asks for your key)"
-            text={`/plugin marketplace add https://github.com/baldiga/hireco-plugin.git\n/plugin install hireco@hireco`}
-          />
-          <CopyBlock label="Claude Code · MCP only" text={`claude mcp add --transport http hireco ${mcpUrl} --header "Authorization: Bearer ${shown}"`} />
-          <CopyBlock
-            label="Codex · Cursor · other MCP clients"
-            text={JSON.stringify({ mcpServers: { hireco: { url: mcpUrl, headers: { Authorization: `Bearer ${shown}` } } } }, null, 2)}
-          />
-        </div>
+      <Step n="04" title="Connect your AI" id="connect">
+        <p className="mb-5 text-mist">
+          {key ? "Your new key is already filled in below." : hasKey ? "Paste your key where you see hk_YOUR_KEY, or generate a new one above to have it filled in." : "Generate your key above and it's filled in below."}
+        </p>
+        <ConnectAgent url={mcpUrl} apiKey={key} />
       </Step>
     </>
   );

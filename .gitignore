@@ -48,3 +48,4 @@ supabase/.temp
 .env*
 /public/downloads
 /dist
+.playwright-mcp/

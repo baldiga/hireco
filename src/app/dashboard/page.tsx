@@ -2,7 +2,10 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Wordmark } from "@/components/Brand";
+import manifest from "../../../extension/manifest.json";
 import CopyBlock from "@/components/CopyBlock";
+import InstallExtension from "@/components/InstallExtension";
+import { ChromeMock } from "@/components/Mocks";
 import { accessFor } from "@/lib/access";
 import { getStatus } from "@/lib/status";
 import { adminClient } from "@/lib/supabase/admin";
@@ -67,22 +70,18 @@ export default async function Dashboard() {
       </section>
 
       <div className="rise d2 mt-12 grid gap-5">
-        <Step n="01" title="Download the extension">
-          <p className="text-mist">A small Chrome extension that reads your connections from your own logged-in LinkedIn.</p>
-          <a href="/downloads/hireco-extension.zip" download className="btn-primary mt-4">↓ Download hireco-extension.zip</a>
-        </Step>
-
-        <Step n="02" title="Install it in Chrome">
-          <ol className="list-decimal space-y-1.5 pl-5 text-frost marker:text-mist">
-            <li>Unzip the file.</li>
-            <li>Open <span className="code rounded bg-black/30 px-1.5 py-0.5">chrome://extensions</span> and turn on <b className="font-normal text-white">Developer mode</b> (top right).</li>
-            <li>Click <b className="font-normal text-white">Load unpacked</b> and choose the <span className="code">hireco-extension</span> folder.</li>
-            <li>Pin Hireco from the puzzle-piece menu so it&apos;s one click away.</li>
-          </ol>
+        <Step n="01" title="Install the Chrome extension">
+          <p className="mb-5 text-mist">
+            A small extension that reads your connections from your own logged-in LinkedIn. It isn&apos;t in the Chrome Web Store yet, so you add it with Developer mode:
+          </p>
+          <div className="grid items-start gap-8 lg:grid-cols-[1fr_20rem]">
+            <InstallExtension />
+            <ChromeMock version={manifest.version} />
+          </div>
         </Step>
 
         <KeyPanel origin={origin} hasKey={(keys.count ?? 0) > 0}>
-          <Step n="04" title="Sync your connections" done={synced}>
+          <Step n="03" title="Sync your connections" done={synced}>
             <p className="text-mist">
               {synced
                 ? `${status.connections.toLocaleString()} connections synced. Press Sync again in the extension whenever you like — it also refreshes daily.`
@@ -91,7 +90,7 @@ export default async function Dashboard() {
           </Step>
         </KeyPanel>
 
-        <Step n="06" title="Ask your first question">
+        <Step n="05" title="Ask your first question">
           <p className="text-mist">In your AI, try one of these. Results come with a CSV and a visual map.</p>
           <div className="mt-4 grid gap-3">{PROMPTS.map((p) => <CopyBlock key={p} text={p} />)}</div>
           <Link href="/guide" className="btn-ghost mt-5">Skills &amp; prompts guide →</Link>

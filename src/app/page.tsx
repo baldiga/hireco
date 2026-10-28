@@ -1,10 +1,15 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+import manifest from "../../extension/manifest.json";
 import { EarlyBadge, Wordmark } from "@/components/Brand";
+import ConnectAgent from "@/components/ConnectAgent";
 import Constellation from "@/components/Constellation";
-import { ChatMock, ChromeMock, PopupMock, TerminalMock } from "@/components/Mocks";
+import InstallExtension from "@/components/InstallExtension";
+import { ChatMock, ChromeMock, PopupMock } from "@/components/Mocks";
 import Radar from "@/components/radar/Radar";
 import WaitlistForm from "@/components/WaitlistForm";
 import { DEMO_MAP } from "@/lib/demoMap";
+import { SITE_URL } from "@/lib/exports";
 
 const PATHS = [
   ["Hiring managers", "People who lead the team you want to join — the ones who actually say yes."],
@@ -15,10 +20,21 @@ const PATHS = [
   ["Ex-coworkers", "People who've seen your work — the warmest referral there is."],
 ];
 
-const STEPS = [
-  { n: "01", title: "Install the extension", body: "Download, unzip, then in Chrome open chrome://extensions → turn on Developer mode → Load unpacked → pick the folder.", mock: <ChromeMock /> },
+const STEPS: { n: string; title: string; body: string; extra?: ReactNode; mock: ReactNode }[] = [
+  {
+    n: "01",
+    title: "Install the extension",
+    body: "It isn't in the Chrome Web Store yet, so you add it yourself with Chrome's Developer mode. It takes about a minute:",
+    extra: <InstallExtension />,
+    mock: <ChromeMock version={manifest.version} />,
+  },
   { n: "02", title: "Sync your network", body: "Paste your Hireco key into the extension and press Sync. It reads your connections from your own logged-in LinkedIn — no passwords leave your browser.", mock: <PopupMock /> },
-  { n: "03", title: "Connect your AI", body: "Add Hireco to Claude Code, Codex or Cursor with one command. It's a standard MCP server.", mock: <TerminalMock /> },
+  {
+    n: "03",
+    title: "Connect your AI",
+    body: "Hireco is a standard MCP server, so it works with Claude Code, the Claude Desktop app, Cursor, Codex, VS Code and more. Pick yours to see exactly where to paste what.",
+    mock: <div className="panel p-6 sm:p-7"><ConnectAgent url={`${SITE_URL}/api/mcp`} /></div>,
+  },
   { n: "04", title: "Ask", body: "Tell your AI the role and companies you want. Get your best paths in, a CSV and a visual map.", mock: <ChatMock /> },
 ];
 
@@ -116,6 +132,7 @@ export default function Home() {
                 <span className="font-display text-6xl font-light text-ice/30">{s.n}</span>
                 <h3 className="font-display mt-2 text-3xl font-normal text-white">{s.title}</h3>
                 <p className="mt-3 max-w-md text-lg leading-relaxed text-mist">{s.body}</p>
+                {s.extra && <div className="mt-6 max-w-lg">{s.extra}</div>}
               </div>
               <div className="relative">
                 <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-[radial-gradient(closest-side,rgba(47,91,234,.22),transparent)]" />
