@@ -3,11 +3,12 @@ import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
 import { verifyApiKey } from "@/lib/apiKeys";
 import { companyIdFromUrn, runSearches, type CompanySpec } from "@/lib/companySearch";
-import { enrichProspects, MAX_PER_CALL } from "@/lib/enrich";
+import { enrichProspects, importProfiles, MAX_PER_CALL } from "@/lib/enrich";
 import { saveExport, type ExportRow } from "@/lib/exports";
 import { autoSpec, BUCKET_INFO, BUCKET_TYPES, rowsFromSpec, type MapSpec } from "@/lib/mapSpec";
 import { findHiringPaths, loadConnections, loadProfile, profileUrl, searchNetwork } from "@/lib/network";
 import { INSTRUCTIONS, welcome } from "@/lib/onboarding";
+import { toolLimit, touchActive } from "@/lib/limits";
 import { getStatus } from "@/lib/status";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -17,6 +18,14 @@ export const maxDuration = 300;
 const userId = (ctx: { http?: { authInfo?: AuthInfo } }) => ctx.http?.authInfo?.extra?.userId as string;
 const json = (data: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(data, null, 1) }] });
 const publicIdOf = (s: string) => decodeURIComponent(s.match(/linkedin\.com\/in\/([^/?#]+)/)?.[1] ?? s.trim());
+
+/** Daily limits and the kill switch. Returns the friendly message to relay, or null to go ahead. */
+async function gate(id: string, tool: string) {
+  const blocked = await toolLimit(id, tool);
+  if (blocked) return json({ limit_reached: true, tell_the_user: blocked });
+  touchActive(id).catch(() => {});
+  return null;
+}
 
 type Person = { name: string; url: string; title: string | null; company: string | null; why: string; enriched: boolean; at_target?: boolean };
 
@@ -30,7 +39,7 @@ const handler = createMcpHandler(
         inputSchema: z.object({}),
         annotations: { readOnlyHint: true },
       },
-      async (_args, ctx) => json(welcome(await getStatus(userId(ctx)))),
+      async (_args, ctx) => (await gate(userId(ctx), "get_started")) ?? json(welcome(await getStatus(userId(ctx)))),
     );
 
     server.registerPrompt(
@@ -73,6 +82,8 @@ const handler = createMcpHandler(
       },
       async (args, ctx) => {
         const id = userId(ctx);
+        const blocked = await gate(id, "find_hiring_paths");
+        if (blocked) return blocked;
         const me = await loadProfile(id);
         const myCompanies = [...new Map((me?.positions ?? []).filter((p) => p.company).map((p) => [p.company!, p])).values()].slice(0, 8);
         const specs: CompanySpec[] = [
@@ -101,7 +112,7 @@ const handler = createMcpHandler(
         const shortlist = (["insiders", "hiring_managers", "decision_makers", "introducers", "ex_coworkers", "recruiters"] as const)
           .flatMap((k) => buckets[k].people.filter((p) => !p.enriched).map((p) => ({ url: p.url, name: p.name, bucket: k, why: p.why })))
           .filter((p) => !seen.has(p.url) && seen.add(p.url))
-          .slice(0, Math.min(status.premium_enrichment.remaining, MAX_PER_CALL));
+          .slice(0, status.premium_enrichment.mode === "agent" ? 20 : Math.min(status.premium_enrichment.remaining, MAX_PER_CALL));
 
         const limit = args.limit_per_bucket ?? 10;
         return json({
@@ -113,7 +124,11 @@ const handler = createMcpHandler(
           premium_enrichment: {
             ...status.premium_enrichment,
             enrichment_shortlist: shortlist,
-            note: shortlist.length ? "Ask the user before calling enrich_prospects with (part of) this shortlist." : undefined,
+            note: status.premium_enrichment.mode === "agent"
+              ? "Enrichment runs in this AI session: if a LinkedIn data tool is connected (e.g. the Zooq MCP profile_full, or the Apify MCP with harvestapi/linkedin-profile-scraper), offer to fetch (part of) this shortlist with it, on the user's own key and only after they agree, then save the results with import_profiles. Otherwise mention it's optional and set up at hireco.help/dashboard#enrich."
+              : shortlist.length
+                ? "Ask the user before calling enrich_prospects with (part of) this shortlist; it uses their early-access allowance."
+                : undefined,
           },
         });
       },
@@ -136,6 +151,8 @@ const handler = createMcpHandler(
       },
       async (args, ctx) => {
         const id = userId(ctx);
+        const blocked = await gate(id, "search_my_network");
+        if (blocked) return blocked;
         const conns = await loadConnections(id);
         const all = searchNetwork(conns, { ...args, limit: 1000 });
         const label = [args.query, args.company, args.title, args.seniority?.join("/")].filter(Boolean).join(" · ") || "Network search";
@@ -178,6 +195,8 @@ const handler = createMcpHandler(
       },
       async (spec, ctx) => {
         const id = userId(ctx);
+        const blocked = await gate(id, "publish_map");
+        if (blocked) return blocked;
         const me = await loadProfile(id);
         const hubs = [...spec.hubs.filter((h) => h.start).slice(0, 8), ...spec.hubs.filter((h) => !h.start)];
         const full: MapSpec = { ...spec, me: me?.full_name ?? "You", hubs };
@@ -193,11 +212,50 @@ const handler = createMcpHandler(
       "enrich_prospects",
       {
         title: "Enrich prospects (premium)",
-        description: `Premium: fetches exact titles and full dated work history for chosen connections. Each new person uses 1 prospect from the user's allowance (already-enriched people are free). Max ${MAX_PER_CALL} per call. Only call after the user approves the list.`,
+        description: `Premium, early-access members only (premium_enrichment.mode = "house"): fetches exact titles and full dated work history for chosen connections from their allowance. Already-enriched people are free. Max ${MAX_PER_CALL} per call. Only call after the user approves the list. Everyone else enriches with their own LinkedIn data tool in this session and saves the results with import_profiles.`,
         inputSchema: z.object({ profiles: z.array(z.string()).min(1).max(MAX_PER_CALL).describe("LinkedIn profile URLs or public ids") }),
       },
       async ({ profiles }, ctx) => {
+        const blocked = await gate(userId(ctx), "enrich_prospects");
+        if (blocked) return blocked;
         const result = await enrichProspects(userId(ctx), profiles.map(publicIdOf));
+        return json({ ...result, ...(result.enriched ? { next: "Re-run find_hiring_paths to see updated buckets with exact titles and ex-coworker overlap." } : {}) });
+      },
+    );
+
+    const ym = z.object({ year: z.number().int(), month: z.number().int().min(1).max(12).optional() });
+    server.registerTool(
+      "import_profiles",
+      {
+        title: "Import enriched profiles",
+        description:
+          "Saves work history you fetched for the user's connections with ANOTHER tool in this session (e.g. the Zooq MCP's profile_full, the Apify MCP's LinkedIn profile scraper, or any LinkedIn data tool the user connected with their own key). This is how premium enrichment works for most members. Map the other tool's fields into this shape; only the user's own connections are updated. Then re-run find_hiring_paths.",
+        inputSchema: z.object({
+          profiles: z.array(z.object({
+            profile: z.string().describe("LinkedIn profile URL or public id of the connection"),
+            headline: z.string().optional(),
+            location: z.string().optional(),
+            positions: z.array(z.object({
+              title: z.string().optional(),
+              company: z.string().optional(),
+              start: ym.optional(),
+              end: ym.nullable().optional().describe("null or omitted for a current role"),
+            })).describe("Work history, newest first"),
+            educations: z.array(z.object({ school: z.string().optional(), degree: z.string().optional(), field: z.string().optional() })).optional(),
+          })).min(1).max(MAX_PER_CALL),
+        }),
+      },
+      async ({ profiles }, ctx) => {
+        const blocked = await gate(userId(ctx), "import_profiles");
+        if (blocked) return blocked;
+        const result = await importProfiles(userId(ctx), profiles.map((p) => ({
+          public_id: publicIdOf(p.profile),
+          full_name: "",
+          headline: p.headline ?? null,
+          location: p.location ?? null,
+          positions: p.positions.map((x) => ({ ...x, end: x.end ?? null })),
+          educations: p.educations ?? [],
+        })));
         return json({ ...result, next: "Re-run find_hiring_paths to see updated buckets with exact titles and ex-coworker overlap." });
       },
     );
@@ -211,6 +269,8 @@ const handler = createMcpHandler(
         annotations: { readOnlyHint: true },
       },
       async ({ profile }, ctx) => {
+        const blocked = await gate(userId(ctx), "get_person");
+        if (blocked) return blocked;
         const { data } = await adminClient()
           .from("connections")
           .select("public_id, first_name, last_name, headline, current_title, current_company, location, positions, educations, connected_at, enriched_at")

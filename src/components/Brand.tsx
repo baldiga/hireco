@@ -33,7 +33,7 @@ export function EarlyBadge() {
   return (
     <span className="inline-flex items-center gap-2 rounded-full border border-champagne/30 bg-champagne/[0.06] px-3 py-1 text-[0.68rem] font-normal uppercase tracking-[0.22em] text-champagne">
       <span className="h-1.5 w-1.5 rounded-full bg-champagne shadow-[0_0_10px_rgba(231,214,176,.9)]" />
-      Early access · free for a limited time
+      Free · open source
     </span>
   );
 }

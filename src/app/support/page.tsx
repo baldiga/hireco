@@ -16,7 +16,7 @@ export default function Support() {
   return (
     <LegalPage eyebrow="Help" title="Support">
       <p>
-        Hireco is in early access and we read every message. Email <a className="text-ice underline decoration-white/20 underline-offset-4" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> and
+        Hireco is free and open source, and we read every message. Email <a className="text-ice underline decoration-white/20 underline-offset-4" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> and
         we&apos;ll get back to you. For setup steps and prompts, see the <Link className="text-ice underline decoration-white/20 underline-offset-4" href="/guide">guide</Link>.
       </p>
       <Section title="Common questions">

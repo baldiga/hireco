@@ -49,3 +49,6 @@ supabase/.temp
 /public/downloads
 /dist
 .playwright-mcp/
+
+# open-source template
+!.env.example

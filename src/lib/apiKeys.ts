@@ -20,12 +20,14 @@ export async function verifyApiKey(key: string | null | undefined): Promise<stri
   const db = adminClient();
   const { data } = await db
     .from("api_keys")
-    .select("id, user_id")
+    .select("id, user_id, last_used_at")
     .eq("key_hash", hash(key))
     .is("revoked_at", null)
     .maybeSingle();
   if (!data) return null;
-  await db.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", data.id);
+  // At most one write an hour per key.
+  if (!data.last_used_at || Date.now() - Date.parse(data.last_used_at) > 3600_000)
+    await db.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", data.id);
   return data.user_id;
 }
 

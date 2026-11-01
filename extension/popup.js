@@ -8,10 +8,17 @@ async function checkKey(apiKey) {
   return res.ok ? res.json() : null;
 }
 
+// The server is asked only when the popup opens, the key changes or a sync finishes,
+// not on every progress update.
+let st = null;
+let seen = { apiKey: undefined, syncing: false };
+
 async function render() {
   const s = await chrome.storage.local.get(null);
   $("error").textContent = s.lastError || "";
-  const st = s.apiKey ? await checkKey(s.apiKey).catch(() => null) : null;
+  const refresh = s.apiKey !== seen.apiKey || (seen.syncing && !s.syncing);
+  seen = { apiKey: s.apiKey, syncing: !!s.syncing };
+  if (refresh) st = s.apiKey ? await checkKey(s.apiKey).catch(() => null) : null;
 
   $("setup").hidden = !!st;
   $("main").hidden = !st;
@@ -24,13 +31,15 @@ async function render() {
   $("hello").textContent = first ? `Hello, ${first}` : "Hello";
   $("email").textContent = st.email || "";
   $("conns").textContent = st.connections.toLocaleString();
-  $("quota").textContent = `${st.premium_enrichment.remaining}`;
-  $("progress").textContent = s.progress || "";
+  const house = st.premium_enrichment.mode !== "agent";
+  $("quota").textContent = house ? `${st.premium_enrichment.remaining}` : (st.enriched_count ?? 0).toLocaleString();
+  $("quota-lbl").textContent = house ? "premium prospects left" : "people enriched";
+  $("progress").textContent = s.progress || s.notice || "";
   $("sync").disabled = !!s.syncing;
   $("sync").textContent = s.syncing ? "Syncing…" : st.connections ? "Sync again" : "Sync now";
   $("s1").classList.toggle("done", st.connections > 0);
   $("s2").classList.toggle("done", !!s.claudeConnected);
-  if (st.connections > 0) renderMaps(s.apiKey);
+  if (refresh && st.connections > 0) renderMaps(s.apiKey);
 }
 
 // ---- My maps (kept for 14 days) ----

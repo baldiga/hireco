@@ -7,9 +7,9 @@ import Constellation from "@/components/Constellation";
 import InstallExtension from "@/components/InstallExtension";
 import { ChatMock, ChromeMock, PopupMock } from "@/components/Mocks";
 import Radar from "@/components/radar/Radar";
-import WaitlistForm from "@/components/WaitlistForm";
+import SignupForm from "@/components/SignupForm";
 import { DEMO_MAP } from "@/lib/demoMap";
-import { SITE_URL } from "@/lib/exports";
+import { REPO_URL, SITE_URL } from "@/lib/exports";
 
 const PATHS = [
   ["Hiring managers", "People who lead the team you want to join — the ones who actually say yes."],
@@ -54,7 +54,7 @@ export default function Home() {
         <nav className="flex items-center gap-6 text-sm text-mist">
           <a href="#how" className="hidden hover:text-frost sm:inline">How it works</a>
           <a href="#example" className="hidden hover:text-frost sm:inline">Example</a>
-          <a href="#early" className="hidden hover:text-frost sm:inline">Early access</a>
+          <a href="#early" className="hidden hover:text-frost sm:inline">Join free</a>
           <Link href="/login" className="hover:text-frost">Sign in</Link>
         </nav>
       </header>
@@ -71,10 +71,10 @@ export default function Home() {
             and hands it straight to your AI agent.
           </p>
           <div className="rise d4 mt-9 flex flex-wrap gap-3">
-            <a href="#early" className="btn-primary">Request early access</a>
+            <a href="#early" className="btn-primary">Create your free account</a>
             <a href="/downloads/hireco-extension.zip" download className="btn-ghost">↓ Download the extension</a>
           </div>
-          <p className="rise d5 mt-5 text-xs text-mist/80">Chrome extension + MCP server · works with Claude, Codex and Cursor</p>
+          <p className="rise d5 mt-5 text-xs text-mist/80">Chrome extension + MCP server · works with Claude, Codex and Cursor · free &amp; open source</p>
         </div>
         <div className="rise d3 relative">
           <div className="absolute -inset-10 -z-10 rounded-full bg-[radial-gradient(closest-side,rgba(47,91,234,.35),transparent)] blur-2xl" />
@@ -173,30 +173,30 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Early access */}
+      {/* Sign up */}
       <section id="early" className="mx-auto w-full max-w-6xl scroll-mt-10 px-6 py-24">
         <div className="panel panel-hi grid gap-12 overflow-hidden p-8 sm:p-12 lg:grid-cols-[1.1fr_1fr]">
           <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[radial-gradient(closest-side,rgba(127,227,255,.18),transparent)]" />
           <div>
             <EarlyBadge />
             <h2 className="font-display mt-6 text-4xl font-light leading-tight text-white sm:text-5xl">
-              Built for early adopters.
+              Free, and open source.
             </h2>
             <p className="mt-5 text-lg leading-relaxed text-mist">
-              Hireco is new, and a little technical — you&apos;ll load a Chrome extension and add an MCP server to your AI.
-              In return you get it free while we&apos;re in early access, including premium enrichment of up to 300 prospects
-              with exact titles and full work history.
+              Hireco is a little technical: you&apos;ll load a Chrome extension and add an MCP server to your AI.
+              It&apos;s free, and the code is <a href={REPO_URL} target="_blank" rel="noreferrer" className="text-ice underline decoration-white/20 underline-offset-4">open source</a>.
+              Premium enrichment (exact titles and full work history) is optional and runs in your own AI, on your own Zooq or Apify account.
             </p>
             <ul className="mt-6 space-y-2 text-frost">
-              {["Free for a limited time", "300 premium prospects included", "Direct line to the team — your feedback shapes the product"].map((t) => (
+              {["Free, no card needed", "Open source (MIT): read it, run it, improve it", "Your keys stay with you: enrichment runs in your own AI"].map((t) => (
                 <li key={t} className="flex items-center gap-3"><span className="h-1.5 w-1.5 rounded-full bg-glint" />{t}</li>
               ))}
             </ul>
           </div>
           <div className="relative">
-            <WaitlistForm />
+            <SignupForm />
             <p className="mt-6 text-center text-sm text-mist">
-              Already approved? <Link href="/login" className="text-ice underline decoration-white/20 underline-offset-4">Sign in</Link>
+              Already a member? <Link href="/login" className="text-ice underline decoration-white/20 underline-offset-4">Sign in</Link>
             </p>
           </div>
         </div>
@@ -207,6 +207,7 @@ export default function Home() {
         <p>Hireco reads only what you can already see on LinkedIn, from your own browser.</p>
         <nav className="flex gap-5">
           <Link href="/guide" className="hover:text-frost">Guide</Link>
+          <a href={REPO_URL} target="_blank" rel="noreferrer" className="hover:text-frost">GitHub</a>
           <Link href="/support" className="hover:text-frost">Support</Link>
           <Link href="/privacy" className="hover:text-frost">Privacy</Link>
           <Link href="/terms" className="hover:text-frost">Terms</Link>

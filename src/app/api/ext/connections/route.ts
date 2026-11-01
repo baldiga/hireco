@@ -1,4 +1,5 @@
 import { extRoute } from "@/lib/ext";
+import { COPY, duration, getSettings } from "@/lib/limits";
 import { adminClient } from "@/lib/supabase/admin";
 
 type Incoming = {
@@ -11,13 +12,38 @@ type Incoming = {
   connected_at?: string;
 };
 
-// Receives connection pages during a sync. First call (no run_id) opens a sync run.
-export const POST = extRoute(async (userId, req) => {
-  const body = (await req.json()) as { run_id?: string; done?: boolean; error?: string; connections?: Incoming[] };
+const HOUR = 3600_000;
+
+/** Why a new sync shouldn't start now, or null. Auto-syncs pause for members who stopped using Hireco. */
+async function syncBlocked(userId: string, auto: boolean) {
+  if ((await getSettings()).paused) return COPY.paused;
   const db = adminClient();
+  if (auto) {
+    const { data: p } = await db.from("profiles").select("last_active_at").eq("id", userId).maybeSingle();
+    if (p && Date.now() - Date.parse(p.last_active_at) > 14 * 24 * HOUR) return "Daily sync is paused while you're away. Press Sync now whenever you're back.";
+  }
+  const { data: last } = await db.from("sync_runs").select("finished_at").eq("user_id", userId).eq("status", "done")
+    .order("started_at", { ascending: false }).limit(1).maybeSingle();
+  const since = last?.finished_at ? Date.now() - Date.parse(last.finished_at) : Infinity;
+  if (since < HOUR) return COPY.synced(duration(since), duration(HOUR - since));
+  return null;
+}
+
+// Receives connection pages during a sync. First call (no run_id) opens a sync run.
+// { check: true } only asks whether a sync may start (extension 0.7+ asks before reading LinkedIn).
+export const POST = extRoute(async (userId, req) => {
+  const body = (await req.json()) as { run_id?: string; done?: boolean; error?: string; check?: boolean; auto?: boolean; connections?: Incoming[] };
+  const db = adminClient();
+
+  if (body.check) {
+    const message = await syncBlocked(userId, !!body.auto);
+    return message ? { skip: true, message } : { ok: true };
+  }
 
   let runId = body.run_id;
   if (!runId) {
+    const message = await syncBlocked(userId, false);
+    if (message) throw new Error(message);
     const { data, error } = await db.from("sync_runs").insert({ user_id: userId, kind: "connections" }).select("id").single();
     if (error) throw error;
     runId = data.id as string;

@@ -1,4 +1,4 @@
-// "You're in" email, sent once when a waitlist row is approved. Same look as
+// "You're in" email, sent once when a member is let in from the queue (or approved by hand). Same look as
 // supabase/templates/magic_link.html (table layout, inline styles for email clients).
 const SERIF = "'Cormorant Garamond',Georgia,'Times New Roman',serif";
 const SANS = "'Hanken Grotesk','Helvetica Neue',Arial,sans-serif";
@@ -16,7 +16,7 @@ const STEPS = [
 export function approvedEmail(fullName: string | null) {
   const first = fullName?.trim().split(/\s+/)[0];
   const hello = first ? `${esc(first)}, you're` : "You're";
-  const subject = "You're in: your Hireco access is ready";
+  const subject = "You're in: your Hireco account is ready";
 
   const steps = STEPS.map(
     (s, i) => `<tr>
@@ -42,7 +42,7 @@ export function approvedEmail(fullName: string | null) {
   </style>
 </head>
 <body style="margin:0;padding:0;background:#030817;" bgcolor="#030817">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Your early access to Hireco is approved. Sign in and map your network in about ten minutes.</div>
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">A spot opened up. Sign in and map your network in about ten minutes.</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#030817" style="background:#030817;">
     <tr>
       <td align="center" style="padding:32px 12px 40px;">
@@ -50,18 +50,18 @@ export function approvedEmail(fullName: string | null) {
           <tr>
             <td style="border-radius:22px 22px 0 0;overflow:hidden;line-height:0;font-size:0;" bgcolor="#071030">
               <a href="https://hireco.help" target="_blank">
-                <img src="https://hireco.help/email/header.png" width="600" height="200" alt="Hireco: Early access" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:22px 22px 0 0;">
+                <img src="https://hireco.help/email/header.png" width="600" height="200" alt="Hireco" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:22px 22px 0 0;">
               </a>
             </td>
           </tr>
           <tr>
             <td class="px" bgcolor="#0a1433" style="background:#0a1433;border:1px solid #1c2b57;border-top:0;border-radius:0 0 22px 22px;padding:40px 44px 36px;">
-              <p style="margin:0 0 10px;font-family:${SANS};font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#e7d6b0;">Access approved</p>
+              <p style="margin:0 0 10px;font-family:${SANS};font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#e7d6b0;">A spot opened up</p>
               <h1 class="h1" style="margin:0 0 16px;font-family:${SERIF};font-weight:300;font-size:40px;line-height:1.08;color:#ffffff;">
                 ${hello} <span style="font-style:italic;color:#b9cdff;">in</span>.
               </h1>
               <p style="margin:0 0 30px;font-family:${SANS};font-size:15px;line-height:1.65;color:#b9c6ea;">
-                Your early access to Hireco is ready. Map your LinkedIn network into the hiring managers, insiders and ex-coworkers who can get you hired, right inside your AI. Early access is free.
+                Your Hireco account is ready. Map your LinkedIn network into the hiring managers, insiders and ex-coworkers who can get you hired, right inside your AI. It's free.
               </p>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                 <tr>
@@ -83,8 +83,8 @@ export function approvedEmail(fullName: string | null) {
           </tr>
           <tr>
             <td class="px" style="padding:24px 44px 0;font-family:${SANS};font-size:12px;line-height:1.6;color:#5d6b96;">
-              You're getting this because you asked for early access to Hireco.<br><br>
-              <a href="https://hireco.help" style="color:#8a99c6;text-decoration:none;">hireco.help</a> &nbsp;&middot;&nbsp; Early access
+              You're getting this because you signed up for Hireco.<br><br>
+              <a href="https://hireco.help" style="color:#8a99c6;text-decoration:none;">hireco.help</a> &nbsp;&middot;&nbsp; Free &amp; open source
             </td>
           </tr>
         </table>
@@ -96,7 +96,7 @@ export function approvedEmail(fullName: string | null) {
 
   const text = `${first ? `${first}, you're` : "You're"} in.
 
-Your early access to Hireco is ready. Early access is free.
+Your Hireco account is ready. It's free.
 
 Sign in: ${LOGIN}
 

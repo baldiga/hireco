@@ -48,7 +48,7 @@ export async function GET() {
             }}
           >
             <div style={{ width: 9, height: 9, borderRadius: 9, backgroundColor: "#e7d6b0" }} />
-            EARLY ACCESS
+            FREE · OPEN SOURCE
           </div>
           <div style={{ display: "flex", fontFamily: "Cormorant", fontSize: 128, lineHeight: 1, marginTop: 22, letterSpacing: 1 }}>Hireco</div>
           <div style={{ display: "flex", fontFamily: "Hanken", fontSize: 24, color: "#8a99c6", marginTop: 10 }}>Your next role is one introduction away.</div>

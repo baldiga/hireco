@@ -13,7 +13,7 @@ const PROMPTS = [
 const TOOLS = [
   ["find_hiring_paths", "The main tool. Sorts your network into hiring managers, decision makers, insiders, recruiters, introducers and ex-coworkers."],
   ["search_my_network", "Filter your connections by company, title, seniority or keyword."],
-  ["enrich_prospects", "Premium. Exact titles and dated work history for people you choose (capped at 300 per member during early access)."],
+  ["enrich_prospects", "Premium. Exact titles and dated work history for people you choose (early-access allowance; everyone else enriches in their own AI with import_profiles)."],
   ["get_person", "Everything Hireco knows about one connection."],
   ["get_started", "The welcome tour."],
 ];

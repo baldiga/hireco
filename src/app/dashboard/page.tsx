@@ -11,6 +11,7 @@ import { getStatus } from "@/lib/status";
 import { adminClient } from "@/lib/supabase/admin";
 import { serverClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
+import { EnrichPanel, MarketingToggle } from "./EnrichPanel";
 import KeyPanel, { Step } from "./KeyPanel";
 
 // Per-user page: render on request.
@@ -31,10 +32,13 @@ export default async function Dashboard() {
     redirect("/login");
   }
 
-  const [status, keys] = await Promise.all([
+  const db = adminClient();
+  const [status, keys, membership] = await Promise.all([
     getStatus(data.user.id),
-    adminClient().from("api_keys").select("id", { count: "exact", head: true }).eq("user_id", data.user.id).is("revoked_at", null),
+    db.from("api_keys").select("id", { count: "exact", head: true }).eq("user_id", data.user.id).is("revoked_at", null),
+    db.from("waitlist").select("marketing_opt_in").eq("email", data.user.email!.toLowerCase()).maybeSingle(),
   ]);
+  const enrichment = status.premium_enrichment;
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
   const synced = status.connections > 0;
@@ -58,7 +62,9 @@ export default async function Dashboard() {
         <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
           {[
             [status.connections.toLocaleString(), "connections synced"],
-            [`${status.premium_enrichment.remaining}`, `of ${status.premium_enrichment.total} premium prospects left`],
+            enrichment.mode === "house"
+              ? [`${enrichment.remaining}`, `of ${enrichment.total} premium prospects left`]
+              : [`${status.enriched_count}`, "people enriched by your AI"],
             [status.last_sync ? new Date(status.last_sync.started_at).toLocaleDateString() : "—", "last sync"],
           ].map(([n, l]) => (
             <div key={l} className="panel p-5">
@@ -105,7 +111,16 @@ export default async function Dashboard() {
           <div className="mt-4 grid gap-3">{PROMPTS.map((p) => <CopyBlock key={p} text={p} />)}</div>
           <Link href="/guide" className="btn-ghost mt-5">Skills &amp; prompts guide →</Link>
         </Step>
+
+        <Step n="06" title="Premium enrichment (optional)" id="enrich">
+          <EnrichPanel house={enrichment.total ? { remaining: enrichment.remaining, total: enrichment.total } : null} />
+        </Step>
       </div>
+
+      <footer className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--line)] pt-6">
+        <MarketingToggle optedIn={!!membership.data?.marketing_opt_in} />
+        <span className="text-xs text-mist">Want your data deleted? <a href="mailto:hello@hireco.help" className="text-ice">hello@hireco.help</a></span>
+      </footer>
     </main>
   );
 }

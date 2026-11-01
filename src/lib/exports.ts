@@ -3,6 +3,7 @@ import { autoSpec, type MapSpec } from "./mapSpec";
 import { adminClient } from "./supabase/admin";
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://hireco.help";
+export const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL ?? "https://github.com/baldiga/hireco";
 
 export type ExportRow = {
   bucket: string;

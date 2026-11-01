@@ -25,7 +25,7 @@ export default function Login() {
         )}
       </div>
       <p className="rise d3 mt-8 text-sm text-mist">
-        New here? <Link href="/#early" className="text-ice underline decoration-white/20 underline-offset-4">Request early access</Link>
+        New here? <Link href="/#early" className="text-ice underline decoration-white/20 underline-offset-4">Create your free account</Link>
       </p>
     </main>
   );
