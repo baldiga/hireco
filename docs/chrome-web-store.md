@@ -4,7 +4,7 @@ Everything needed to fill in the [Developer Dashboard](https://chrome.google.com
 
 ## Package
 
-- Upload: `dist/hireco-chrome-web-store.zip` (manifest at the zip root; only `linkedin.com` and `hireco.help` host access).
+- Upload: `dist/hireco-chrome-web-store.zip` (manifest at the zip root; host access: `linkedin.com`, `hireco.help` and the Hireco Supabase project).
 - Bump `version` in `extension/manifest.json` for every new upload.
 
 ## Store listing
@@ -23,7 +23,7 @@ Your next role is one introduction away.
 Hireco maps your LinkedIn network into the people who can actually get you hired — hiring managers, decision makers, insiders at your target companies, recruiters, introducers who used to work there, and ex-coworkers who've seen your work.
 
 HOW IT WORKS
-1. Install the extension and sign in to Hireco with your early-access account.
+1. Install the extension and create your free Hireco account.
 2. Press Sync. Hireco reads your 1st-degree connections from your own logged-in LinkedIn — no passwords leave your browser.
 3. Connect Hireco to your AI agent (Claude, Codex, Cursor) with your personal key.
 4. Ask: "Who in my network can get me hired as Head of Growth at Stripe?" — and get your best paths in, ranked, with a radar map and a CSV.
@@ -35,9 +35,9 @@ WHAT YOU GET
 • Your maps kept for 14 days, one click away in the extension
 
 PRIVATE BY DESIGN
-The extension works inside your own LinkedIn session and only on linkedin.com and hireco.help. Hireco never sees your LinkedIn password or cookies, and never messages anyone for you.
+The extension works inside your own LinkedIn session and only talks to linkedin.com and Hireco's own servers. Hireco never sees your LinkedIn password or cookies, and never messages anyone for you.
 
-Hireco is in early access and free for a limited time. Request access at https://hireco.help
+Hireco is free and open source (MIT): https://github.com/baldiga/hireco. Create your account at https://hireco.help
 
 **Images:** `dist/store/1-hero.png`, `2-radar.png`, `3-list.png`, `4-extension.png` (1280×800) · small promo tile `dist/store/promo-440x280.png` · icon is in the package (`icons/icon-128.png`).
 
@@ -54,7 +54,8 @@ Hireco syncs the user's own LinkedIn connections to their Hireco account so thei
 - `scripting` — runs LinkedIn requests inside a linkedin.com tab, so they use the user's own logged-in session.
 - `tabs` — finds an open linkedin.com tab, or opens a background one for syncing; opens Hireco maps and the dashboard from the popup.
 - Host `https://www.linkedin.com/*` — reads the user's own connections and runs the searches they ask for.
-- Host `https://hireco.help/*` — sends synced data to the user's Hireco account and receives search requests.
+- Host `https://hireco.help/*` — sends synced data to the user's Hireco account.
+- Host `https://frkrubdwndewjeoimnhi.supabase.co/*` — Hireco's own backend: checks for company searches the user's AI agent requested (authenticated with the user's Hireco key).
 
 **Remote code:** No, I am not using remote code. (All JavaScript is in the package.)
 
@@ -72,7 +73,7 @@ Hireco syncs the user's own LinkedIn connections to their Hireco account so thei
 
 ## Distribution
 
-Start with **Unlisted** visibility (installable by link, not searchable) while early access is invite-only. Switch to Public later.
+**Public**: Hireco is open to everyone. (Unlisted is fine for a first review if you prefer.)
 
 ## Review risks to expect
 
